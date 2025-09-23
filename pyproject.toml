@@ -1,0 +1,27 @@
+[project]
+name = "CUXR_BCI"
+version = "0.0.1"
+authors = [
+  { name="Alan Wu", email="alanyowu@outlook.com" },
+  { name="Ashee B Bansaal", email="ab3235@cornell.edu"}
+]
+description = "The project is a Brain-Computer Interface integrated with Virtual Reality, specifically for navigation control."
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "numpy",
+    "brainflow",
+]
+
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/CUXR/bci"
+Issues = "https://github.com/CUXR/bci/issues"
