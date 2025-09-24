@@ -1,2 +1,4 @@
 brainflow
 numpy
+pyqtgraph
+PyQt5
