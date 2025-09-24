@@ -4,6 +4,10 @@ import numpy as np
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations
 
+# Handle Ctrl+C
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 class BandPlotWindow(QtWidgets.QMainWindow):
     def __init__(self, board, eeg_channel, sampling_rate):
         super().__init__()
@@ -52,16 +56,24 @@ class BandPlotWindow(QtWidgets.QMainWindow):
         signal = data[self.eeg_channel]
         # maybe detrend
         DataFilter.detrend(signal, DetrendOperations.CONSTANT.value)
+        
         # compute PSD
-        psd = DataFilter.get_psd_welch(signal, self.psd_nfft,
-                                              self.psd_overlap, self.sr,
-                                              WindowOperations.HANNING.value)
+        # if signal is too short, return None
+        if len(signal) >= self.psd_nfft:
+            psd = DataFilter.get_psd_welch(signal, self.psd_nfft,
+                                        self.psd_overlap, self.sr,
+                                        WindowOperations.HANNING.value)
+        else:
+            psd = None
         # compute band powers
         band_powers = {}
         for name, (f_low, f_high) in self.bands.items():
-            bp = DataFilter.get_band_power(psd, f_low, f_high)
+            if psd is not None:
+                bp = DataFilter.get_band_power(psd, f_low, f_high)
+            else:
+                bp = 0
             band_powers[name] = bp
-        
+
         # update time
         t = QtCore.QTime.currentTime().msecsSinceStartOfDay() / 1000.0
         self.time_axis.append(t)
