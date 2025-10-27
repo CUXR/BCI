@@ -215,3 +215,4 @@ __marimo__/
 
 # For this project
 temp/
+*.DS_Store

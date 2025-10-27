@@ -2,3 +2,6 @@ brainflow
 numpy
 pyqtgraph
 PyQt5
+mne
+scipy
+matplotlib
