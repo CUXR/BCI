@@ -3,6 +3,7 @@ import pyqtgraph as pg
 import numpy as np
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations
+from eeg_filters import EEGFilter
 
 # Handle Ctrl+C
 import signal
@@ -14,6 +15,9 @@ class BandPlotWindow(QtWidgets.QMainWindow):
         self.board = board
         self.eeg_channel = eeg_channel
         self.sr = sampling_rate
+        
+        # Initialize EEG filter
+        self.eeg_filter = EEGFilter(sampling_rate, notch_freq=50.0)  # 50 Hz for Europe, change to 60 for US
         
         # Set up GUI plot
         self.graphWidget = pg.PlotWidget()
@@ -27,13 +31,14 @@ class BandPlotWindow(QtWidgets.QMainWindow):
         # Store curves for each band
         self.curves = {}
         self.bands = {
-            'delta': (0.5, 4),
-            'theta': (4, 8),
+            # 'delta': (0.5, 4),
+            # 'theta': (4, 8),
             'alpha': (8, 13),
             'beta': (13, 30),
             'gamma': (30, 50)
         }
-        colors = {'delta':'r', 'theta':'g', 'alpha':'b', 'beta':'y', 'gamma':'m'}
+        #'delta':'r', 'theta':'g',
+        colors = { 'alpha':'b', 'beta':'y', 'gamma':'m'}
         for name in self.bands:
             pen = pg.mkPen(color=colors[name], width=2)
             self.curves[name] = self.graphWidget.plot([], [], pen=pen, name=name)
@@ -54,8 +59,17 @@ class BandPlotWindow(QtWidgets.QMainWindow):
         data = self.board.get_current_board_data(n_samples)
         # data is shape [channel][samples]
         signal = data[self.eeg_channel]
-        # maybe detrend
-        DataFilter.detrend(signal, DetrendOperations.CONSTANT.value)
+        
+        # Apply comprehensive EEG filtering
+        signal = self.eeg_filter.apply_comprehensive_filter(
+            signal, 
+            bandpass=True,    # Keep only 1-40 Hz
+            notch=True,       # Remove 50/60 Hz powerline noise
+            detrend=True      # Remove slow drifts
+        )
+        
+        # Additional artifact removal for movement
+        signal = self.eeg_filter.apply_moving_artifact_removal(signal, threshold=3.0)
         
         # compute PSD
         # if signal is too short, return None
