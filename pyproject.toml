@@ -14,6 +14,7 @@ dependencies = [
     "brainflow",
     "pyqtgraph",
     "PyQt5",
+    "mne",
 ]
 
 
