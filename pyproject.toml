@@ -13,7 +13,7 @@ dependencies = [
     "numpy",
     "brainflow",
     "pyqtgraph",
-    "PyQt5",
+    "PyQt6",
     "mne",
 ]
 
