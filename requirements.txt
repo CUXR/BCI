@@ -1,7 +1,7 @@
 brainflow
 numpy
 pyqtgraph
-PyQt5
+PyQt6
 mne
 scipy
 matplotlib

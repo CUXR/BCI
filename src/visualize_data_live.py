@@ -1,4 +1,4 @@
-from PyQt5 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore
 import pyqtgraph as pg
 import numpy as np
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds, BrainFlowPresets
@@ -215,7 +215,7 @@ def main():
     app = QtWidgets.QApplication([])
     win = BandPlotWindow(board, eeg_chs, sr)
     win.show()
-    app.exec_()
+    app.exec()
     
     board.stop_stream()
     board.release_session()
