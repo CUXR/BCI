@@ -103,7 +103,10 @@ class MuseEEGGui(QtWidgets.QMainWindow):
             ("Marker 3 – Relax", 3, "relax"),
         ]
         for text, code, label in markers:
-            marker_layout.addWidget(self._btn(text, lambda c=code, l=label: self.add_marker(c, l)))
+            # Use a factory function to properly capture code and label in closure
+            def make_marker_handler(marker_code, marker_label):
+                return lambda: self.add_marker(marker_code, marker_label)
+            marker_layout.addWidget(self._btn(text, make_marker_handler(code, label)))
 
         marker_layout.addStretch(1)
 
@@ -138,7 +141,8 @@ class MuseEEGGui(QtWidgets.QMainWindow):
 
         self._log("Connecting to Muse2…")
         try:
-            BoardShim.enable_board_logger()
+            # Disable board logger to suppress "0 is a default value" errors
+            # BoardShim.enable_board_logger()  # Commented out to avoid marker 0 errors
 
             params = BrainFlowInputParams()
             board_id = BoardIds.MUSE_2_BOARD.value
@@ -223,18 +227,58 @@ class MuseEEGGui(QtWidgets.QMainWindow):
             self._log(f"Cannot add marker ({label}): not recording.")
             return
 
+        # BrainFlow doesn't allow 0 as a marker code (it's reserved as default)
+        if code == 0 or code is None:
+            self._log(f"Error: Marker code 0 is not allowed (reserved by BrainFlow).")
+            return
+
+        # Ensure code is a valid number
+        try:
+            code_float = float(code)
+            if code_float == 0.0:
+                self._log(f"Error: Marker code cannot be 0.")
+                return
+        except (ValueError, TypeError):
+            self._log(f"Error: Invalid marker code: {code}")
+            return
+
         ts = time.time()
 
         try:
-            self.board.insert_marker(float(code))
-        except Exception:
-            pass
+            self.board.insert_marker(code_float)
+        except BrainFlowError as e:
+            error_msg = str(e)
+            # Suppress the specific "0 is a default value" error from BrainFlow logger
+            if "0 is a default value" not in error_msg.lower():
+                self._log(f"BrainFlow error inserting marker: {e}")
+            return
+        except Exception as e:
+            self._log(f"Error inserting marker: {e}")
+            return
 
         try:
             with open(self.marker_file, "a") as f:
                 f.write(f"{ts},{code},{label}\n")
         except Exception as e:
             self._log(f"Failed to write marker file: {e}")
+
+        # Add empty row to EEG CSV as marker
+        try:
+            # Determine number of columns by reading first line if file exists
+            num_columns = 41  # Default based on header structure
+            if os.path.exists(self.eeg_file):
+                with open(self.eeg_file, "r") as f:
+                    first_line = f.readline().strip()
+                    if first_line:
+                        # Count tab-separated columns
+                        num_columns = len(first_line.split("\t"))
+            
+            # Append empty row with correct number of columns
+            with open(self.eeg_file, "a") as f:
+                empty_row = "\t".join([""] * num_columns) + "\n"
+                f.write(empty_row)
+        except Exception as e:
+            self._log(f"Failed to write empty marker row to EEG CSV: {e}")
 
         pretty_name = label.replace("_", " ").title()
         self._log(f"Marker sent: {pretty_name} (code={code})")
