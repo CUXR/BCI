@@ -2,6 +2,17 @@
 Psychopy experiment for streaming MUSE EEG data with markers.
 Implements unified trial log structure per PROGRAMMING_REQUIREMENTS.md
 and experiment procedure per EXPERIMENT_PROCEDURE.md
+
+Structured experiment flow:
+1. Connect to Muse and start recording
+2. Loop 3 times (LEFT, RIGHT alternating):
+   - Play audio instruction for LEFT/RIGHT via TTS
+   - Recording starts immediately after instruction
+   - Participant imagines the movement
+   - Participant presses SPACE when done
+   - 5 second rest period
+3. Blink block: Record 10 intentional blinks (press B for each)
+4. Save data and exit
 """
 
 import os
@@ -9,6 +20,8 @@ import sys
 import time
 import threading
 import csv
+import subprocess
+import platform
 from datetime import datetime
 from pathlib import Path
 from enum import Enum
@@ -22,6 +35,65 @@ from brainflow.board_shim import (
     BrainFlowInputParams,
     BrainFlowPresets,
 )
+
+# Text-to-speech setup
+def speak_text(text, wait=True):
+    """Speak text using system TTS.
+    
+    On macOS: uses 'say' command
+    On Windows: uses edge-tts or pyttsx3
+    On Linux: uses espeak or pyttsx3
+    
+    Args:
+        text: Text to speak
+        wait: If True, block until speech is complete
+    """
+    system = platform.system()
+    
+    try:
+        if system == "Darwin":  # macOS
+            # Use macOS 'say' command with a natural voice
+            cmd = ["say", "-v", "Samantha", "-r", "180", text]
+            if wait:
+                subprocess.run(cmd, check=True)
+            else:
+                subprocess.Popen(cmd)
+        elif system == "Windows":
+            # Try edge-tts first (Microsoft voices), fallback to pyttsx3
+            try:
+                import edge_tts
+                import asyncio
+                
+                async def speak():
+                    communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
+                    await communicate.save("temp_speech.mp3")
+                    # Play the audio
+                    import playsound
+                    playsound.playsound("temp_speech.mp3")
+                    os.remove("temp_speech.mp3")
+                
+                if wait:
+                    asyncio.run(speak())
+                else:
+                    threading.Thread(target=lambda: asyncio.run(speak())).start()
+            except ImportError:
+                # Fallback to pyttsx3
+                import pyttsx3
+                engine = pyttsx3.init()
+                engine.setProperty('rate', 150)
+                if wait:
+                    engine.say(text)
+                    engine.runAndWait()
+                else:
+                    threading.Thread(target=lambda: (engine.say(text), engine.runAndWait())).start()
+        else:  # Linux
+            cmd = ["espeak", "-s", "150", text]
+            if wait:
+                subprocess.run(cmd, check=True)
+            else:
+                subprocess.Popen(cmd)
+    except Exception as e:
+        print(f"TTS Error: {e}. Continuing without audio.")
 
 
 class TrialType(Enum):
@@ -635,25 +707,35 @@ class MusePsychopyRecorder:
 
 
 def run_experiment():
-    """Run the Psychopy experiment following EXPERIMENT_PROCEDURE.md"""
+    """Run the structured Psychopy experiment with TTS audio instructions.
+    
+    Experiment Flow:
+    1. Press SPACE to connect to Muse
+    2. Press ENTER to start the structured experiment
+    3. Automated loop (3 repetitions of LEFT + RIGHT):
+       - Audio instruction for LEFT -> Recording starts -> Press SPACE when done -> 5s rest
+       - Audio instruction for RIGHT -> Recording starts -> Press SPACE when done -> 5s rest
+    4. Blink block: Press B for each intentional blink (10 blinks target)
+    5. Data saved automatically at end
+    
+    Press ESC at any time to abort and save data.
+    """
     # Create recorder
     recorder = MusePsychopyRecorder(blink_window_ms=200)  # ±200ms window
     
-    # Create monitor specification to avoid warnings
-    # Note: Frame rate warnings on macOS are common and usually harmless.
-    # If you still see frame rate warnings, try:
-    # 1. Close other applications (especially GPU-intensive ones)
-    # 2. Disable "Displays have separate spaces" in System Preferences > Mission Control
-    # 3. Use fullscreen mode (set fullscr=True) for more consistent timing
-    # 4. The warnings don't affect EEG data collection accuracy
+    # Experiment parameters
+    NUM_REPETITIONS = 3  # Number of LEFT/RIGHT pairs
+    REST_DURATION = 5.0  # Rest period in seconds
+    TARGET_BLINKS = 10   # Number of intentional blinks to collect
+    
+    # Create monitor specification
     from psychopy import monitors
     mon = monitors.Monitor('defaultMonitor')
-    mon.setWidth(30)  # Approximate width in cm (adjust to your monitor)
-    mon.setDistance(60)  # Viewing distance in cm
-    mon.setSizePix([1280, 800])  # Match your window size
-    # Note: Refresh rate is automatically detected by PsychoPy from the monitor
+    mon.setWidth(30)
+    mon.setDistance(60)
+    mon.setSizePix([1280, 800])
     
-    # Create window with proper settings for frame rate measurement
+    # Create window
     win = visual.Window(
         size=(1280, 800),
         fullscr=False,
@@ -663,25 +745,20 @@ def run_experiment():
         colorSpace='rgb',
         allowGUI=True,
         monitor=mon,
-        waitBlanking=True,  # Sync to vertical blank for consistent frame rate
-        useFBO=True,  # Use framebuffer object for better performance
+        waitBlanking=True,
+        useFBO=True,
     )
     
     # Color scheme
-    bg_color = [0.15, 0.15, 0.2]
-    primary_color = [0.2, 0.5, 0.9]
     success_color = [0.2, 0.8, 0.4]
     warning_color = [1.0, 0.7, 0.2]
     error_color = [0.9, 0.3, 0.3]
     text_color = [0.95, 0.95, 0.95]
     accent_color = [0.4, 0.6, 1.0]
-    
-    # Left/Right colors for motor imagery cues
     left_color = [0.3, 0.7, 0.9]  # Cyan-blue
     right_color = [0.5, 0.8, 0.4]  # Green
+    rest_color = [0.6, 0.6, 0.6]  # Gray
     
-    # Font setting (use None for system default to avoid font loading warnings)
-    # Arial should work on macOS, but None is safer
     text_font = None  # System default font
     
     # Visual elements
@@ -703,28 +780,41 @@ def run_experiment():
         font=text_font, bold=True, colorSpace='rgb'
     )
     
-    # Motor imagery cue (large arrow/symbol)
+    # Motor imagery cue
     cue_circle = visual.Circle(
         win, radius=150, pos=(0, 0),
-        fillColor=None, lineColor=None, lineWidth=1,  # Must be > 0 to avoid division by zero
+        fillColor=None, lineColor=None, lineWidth=1,
         colorSpace='rgb'
     )
-    cue_circle.setAutoDraw(False)
     
     cue_text = visual.TextStim(
         win, text="",
         pos=(0, 0), height=120,
         font=text_font, bold=True, colorSpace='rgb'
     )
-    cue_text.setAutoDraw(False)
     
     instruction_text = visual.TextStim(
         win, text="",
         pos=(0, -200), height=24,
         color=text_color, font=text_font,
+        colorSpace='rgb', wrapWidth=800
+    )
+    
+    # Progress display
+    progress_text = visual.TextStim(
+        win, text="",
+        pos=(0, 180), height=22,
+        color=text_color, font=text_font,
         colorSpace='rgb'
     )
-    instruction_text.setAutoDraw(False)
+    
+    # Countdown display
+    countdown_text = visual.TextStim(
+        win, text="",
+        pos=(0, -50), height=80,
+        color=rest_color, font=text_font, bold=True,
+        colorSpace='rgb'
+    )
     
     # Recording indicator
     recording_dot = visual.Circle(
@@ -732,203 +822,347 @@ def run_experiment():
         fillColor=success_color, lineColor=None,
         colorSpace='rgb'
     )
-    recording_dot.setAutoDraw(False)
     
-    # Trial counter display
-    trial_counter_text = visual.TextStim(
-        win, text="",
-        pos=(0, 180), height=20,
-        color=text_color, font=text_font,
-        colorSpace='rgb'
-    )
-    trial_counter_text.setAutoDraw(False)
-    
-    # Main experiment state
-    connected = False
-    recording = False
-    experiment_state = ExperimentState.IDLE
     clock = core.Clock()
-    pulse_phase = 0
     
-    # Motor imagery trial state
-    current_mi_trial = None
-    mi_trial_start_time = None
-    waiting_for_spacebar = False
+    def update_display():
+        """Redraw the screen."""
+        status_box.draw()
+        status_text.draw()
+        title.draw()
+        win.flip()
     
-    # Block counters
-    left_trials_completed = 0
-    right_trials_completed = 0
-    blink_trials_completed = 0
-    target_left_trials = 10  # Adjust as needed
-    target_right_trials = 10
-    target_blink_trials = 10
+    def show_instruction_screen(text, color=text_color):
+        """Show instruction text on screen."""
+        instruction_text.text = text
+        instruction_text.color = color
+        status_box.draw()
+        status_text.draw()
+        title.draw()
+        progress_text.draw()
+        instruction_text.draw()
+        win.flip()
     
-    # Initial draw
-    status_box.draw()
-    status_text.draw()
-    title.draw()
+    def show_cue(direction, color, text_label):
+        """Show the motor imagery cue."""
+        cue_circle.fillColor = [c * 0.2 for c in color]
+        cue_circle.lineColor = color
+        cue_circle.lineWidth = 8
+        cue_text.text = text_label
+        cue_text.color = color
+        
+        status_box.draw()
+        status_text.draw()
+        title.draw()
+        progress_text.draw()
+        cue_circle.draw()
+        cue_text.draw()
+        instruction_text.draw()
+        recording_dot.draw()
+        win.flip()
+    
+    def show_rest_countdown(duration):
+        """Show rest period with countdown."""
+        start_time = time.time()
+        while time.time() - start_time < duration:
+            remaining = int(duration - (time.time() - start_time)) + 1
+            countdown_text.text = str(remaining)
+            
+            instruction_text.text = "REST - Relax and prepare for next trial"
+            instruction_text.color = rest_color
+            
+            status_box.draw()
+            status_text.draw()
+            title.draw()
+            progress_text.draw()
+            instruction_text.draw()
+            countdown_text.draw()
+            recording_dot.draw()
+            win.flip()
+            
+            # Check for escape
+            if 'escape' in event.getKeys():
+                return False
+            
+            core.wait(0.1)
+        
+        countdown_text.text = ""
+        return True
+    
+    def wait_for_keypress(key='space'):
+        """Wait for a specific key press, return False if escape pressed."""
+        event.clearEvents()
+        while True:
+            keys = event.getKeys()
+            if 'escape' in keys:
+                return False
+            if key in keys:
+                return True
+            core.wait(0.01)
+    
+    # ========== PHASE 1: Connection ==========
+    instruction_text.text = "Press SPACE to connect to Muse headband"
+    instruction_text.color = text_color
+    update_display()
+    instruction_text.draw()
     win.flip()
     
-    # Main loop
-    while True:
+    # Wait for space to connect
+    connected = False
+    while not connected:
         keys = event.getKeys()
-        current_time = clock.getTime()
-        
         if 'escape' in keys:
-            break
-        
-        # Connection and recording setup
-        elif 'space' in keys and not connected:
+            win.close()
+            core.quit()
+            return
+        if 'space' in keys:
+            status_text.text = "● Connecting..."
+            status_text.color = warning_color
+            update_display()
+            
             if recorder.connect():
                 connected = True
                 if recorder.start_streaming():
                     status_text.text = "● Connected • Streaming"
                     status_text.color = success_color
-                    status_text.draw()
-                    win.flip()
-        
-        elif 'return' in keys and connected and not recording:
-            if recorder.start_recording():
-                recording = True
-                status_text.text = "● Connected • Recording"
-                status_text.color = success_color
-                recording_dot.setAutoDraw(True)
-                experiment_state = ExperimentState.MOTOR_IMAGERY_BLOCK
-                # Start with motor imagery block
-                instruction_text.text = "Press 'L' to start LEFT motor imagery trial\nPress 'R' to start RIGHT motor imagery trial\nPress 'N' for baseline, 'K' for blink block"
-                instruction_text.setAutoDraw(True)
-        
-        # Motor Imagery Trials (per EXPERIMENT_PROCEDURE.md)
-        elif 'l' in keys and recording and not waiting_for_spacebar:
-            # Start LEFT motor imagery trial
-            current_mi_trial = recorder.start_trial(
-                TrialType.MOTOR_IMAGERY_LEFT,
-                block_number=1,
-                notes="Left motor imagery"
-            )
-            mi_trial_start_time = time.time()
-            waiting_for_spacebar = True
-            
-            # Visual cue: LEFT (cyan-blue)
-            cue_circle.fillColor = [c * 0.2 for c in left_color]
-            cue_circle.lineColor = left_color
-            cue_circle.lineWidth = 8
-            cue_text.text = "← LEFT"
-            cue_text.color = left_color
-            cue_circle.setAutoDraw(True)
-            cue_text.setAutoDraw(True)
-            instruction_text.text = "Imagine grabbing LEFT cup\nPress SPACEBAR when done"
-            instruction_text.color = left_color
-        
-        elif 'r' in keys and recording and not waiting_for_spacebar:
-            # Start RIGHT motor imagery trial
-            current_mi_trial = recorder.start_trial(
-                TrialType.MOTOR_IMAGERY_RIGHT,
-                block_number=1,
-                notes="Right motor imagery"
-            )
-            mi_trial_start_time = time.time()
-            waiting_for_spacebar = True
-            
-            # Visual cue: RIGHT (green)
-            cue_circle.fillColor = [c * 0.2 for c in right_color]
-            cue_circle.lineColor = right_color
-            cue_circle.lineWidth = 8
-            cue_text.text = "RIGHT →"
-            cue_text.color = right_color
-            cue_circle.setAutoDraw(True)
-            cue_text.setAutoDraw(True)
-            instruction_text.text = "Imagine grabbing RIGHT cup\nPress SPACEBAR when done"
-            instruction_text.color = right_color
-        
-        elif 'space' in keys and waiting_for_spacebar and current_mi_trial is not None:
-            # End motor imagery trial (participant-controlled)
-            ended_trial = recorder.end_trial()
-            waiting_for_spacebar = False
-            
-            # Update counters
-            if ended_trial and ended_trial.trial_type == TrialType.MOTOR_IMAGERY_LEFT:
-                left_trials_completed += 1
-            elif ended_trial and ended_trial.trial_type == TrialType.MOTOR_IMAGERY_RIGHT:
-                right_trials_completed += 1
-            
-            current_mi_trial = None
-            
-            # Hide cue
-            cue_circle.setAutoDraw(False)
-            cue_text.setAutoDraw(False)
-            instruction_text.text = "Trial complete!\nPress 'L' for LEFT, 'R' for RIGHT\n'N' for baseline, 'K' for blink block"
-            instruction_text.color = text_color
-        
-        # Baseline Trials
-        elif 'n' in keys and recording and not waiting_for_spacebar and experiment_state != ExperimentState.BLINK_BLOCK:
-            if experiment_state != ExperimentState.BASELINE_BLOCK:
-                experiment_state = ExperimentState.BASELINE_BLOCK
-                instruction_text.text = "BASELINE MODE\nPress 'Q' for quiet rest, 'A' for active engagement\nPress SPACEBAR to end baseline"
-                instruction_text.color = warning_color
-        
-        elif 'q' in keys and recording and experiment_state == ExperimentState.BASELINE_BLOCK:
-            # Start quiet baseline
-            recorder.start_trial(TrialType.BASELINE_QUIET, block_number=2, notes="Quiet rest baseline")
-            waiting_for_spacebar = True
-            instruction_text.text = "QUIET REST - Eyes open, low stimulation\nPress SPACEBAR to end"
-        
-        elif 'a' in keys and recording and experiment_state == ExperimentState.BASELINE_BLOCK:
-            # Start active baseline
-            recorder.start_trial(TrialType.BASELINE_ACTIVE, block_number=2, notes="Active engagement baseline")
-            waiting_for_spacebar = True
-            instruction_text.text = "ACTIVE ENGAGEMENT - Natural activity\nPress SPACEBAR to end"
-        
-        elif 'space' in keys and waiting_for_spacebar and experiment_state == ExperimentState.BASELINE_BLOCK:
-            # End baseline trial
-            recorder.end_trial()
-            waiting_for_spacebar = False
-            instruction_text.text = "Baseline complete!\nPress 'Q' for quiet, 'A' for active\n'L'/'R' for motor imagery, 'N' for baseline, 'K' for blink block"
-            instruction_text.color = text_color
-        
-        # Blink Block (per EXPERIMENT_PROCEDURE.md: at end of experiment)
-        elif 'k' in keys and recording and not waiting_for_spacebar and experiment_state != ExperimentState.BLINK_BLOCK:
-            experiment_state = ExperimentState.BLINK_BLOCK
-            instruction_text.text = f"BLINK BLOCK\nPress 'B' to record intentional blink ({blink_trials_completed}/{target_blink_trials})\nPress 'K' again when done with blink block"
-            instruction_text.color = warning_color
-        
-        elif 'b' in keys and recording and experiment_state == ExperimentState.BLINK_BLOCK and not waiting_for_spacebar:
-            # Record intentional blink (event-centered, ±200ms)
-            if recorder.add_blink_marker():
-                blink_trials_completed += 1
-                instruction_text.text = f"Blink recorded! ({blink_trials_completed}/{target_blink_trials})\nPress 'B' for another blink\nPress 'K' to finish blink block"
-        
-        elif 'k' in keys and experiment_state == ExperimentState.BLINK_BLOCK and blink_trials_completed > 0:
-            # Finish blink block (press K again after recording blinks)
-            experiment_state = ExperimentState.COMPLETE
-            instruction_text.text = "Experiment Complete!\nPress ESC to save and exit"
-            instruction_text.color = success_color
-        
-        # Update trial counter display
-        if recording:
-            trial_counter_text.text = f"Trials: Left={left_trials_completed}, Right={right_trials_completed}, Blink={blink_trials_completed}"
-            trial_counter_text.setAutoDraw(True)
-        
-        # Pulsing recording indicator
-        if recording:
-            pulse_phase += 0.1
-            alpha = 0.5 + 0.5 * np.sin(pulse_phase)
-            recording_dot.fillColor = [c * alpha for c in success_color]
-        
-        # Draw all elements
-        status_box.draw()
-        status_text.draw()
-        title.draw()
-        
-        # Draw dynamic elements (auto-drawn)
-        win.flip()
+                else:
+                    status_text.text = "● Connection failed"
+                    status_text.color = error_color
+                    connected = False
+            else:
+                status_text.text = "● Connection failed - Press SPACE to retry"
+                status_text.color = error_color
+            update_display()
+        core.wait(0.01)
     
-    # Cleanup
-    if recording:
-        recorder.stop_recording()
-    if connected:
+    # ========== PHASE 2: Start Experiment ==========
+    instruction_text.text = "Connected!\n\nPress ENTER to start the structured experiment\n\nYou will do 3 rounds of LEFT and RIGHT motor imagery,\nfollowed by a blink recording session.\nAudio instructions will guide you.\nPress SPACE when you finish each imagery task."
+    instruction_text.color = success_color
+    status_box.draw()
+    status_text.draw()
+    title.draw()
+    instruction_text.draw()
+    win.flip()
+    
+    # Wait for ENTER to start
+    while True:
+        keys = event.getKeys()
+        if 'escape' in keys:
+            recorder.stop_streaming()
+            recorder.disconnect()
+            win.close()
+            core.quit()
+            return
+        if 'return' in keys:
+            break
+        core.wait(0.01)
+    
+    # Start recording
+    if not recorder.start_recording():
+        status_text.text = "● Recording failed"
+        status_text.color = error_color
+        update_display()
+        core.wait(2)
         recorder.stop_streaming()
         recorder.disconnect()
+        win.close()
+        core.quit()
+        return
+    
+    status_text.text = "● Connected • Recording"
+    status_text.color = success_color
+    
+    # ========== PHASE 3: Main Experiment Loop ==========
+    # Audio instructions
+    LEFT_INSTRUCTION = "Now, imagine reaching out with your left hand to grab a cup on your left side. Focus on the sensation of your left hand moving."
+    RIGHT_INSTRUCTION = "Now, imagine reaching out with your right hand to grab a cup on your right side. Focus on the sensation of your right hand moving."
+    
+    left_completed = 0
+    right_completed = 0
+    
+    experiment_aborted = False
+    
+    for rep in range(NUM_REPETITIONS):
+        if experiment_aborted:
+            break
+            
+        # Update progress
+        total_done = left_completed + right_completed
+        total_trials = NUM_REPETITIONS * 2
+        progress_text.text = f"Progress: {total_done}/{total_trials} trials | Round {rep + 1}/{NUM_REPETITIONS}"
+        
+        # ===== LEFT TRIAL =====
+        # Show preparing screen
+        show_instruction_screen(f"Round {rep + 1}/{NUM_REPETITIONS}: LEFT motor imagery\n\nListen to the audio instruction...", left_color)
+        core.wait(0.5)
+        
+        # Play audio instruction (blocking - waits until speech is done)
+        speak_text(LEFT_INSTRUCTION, wait=True)
+        
+        # Start LEFT trial immediately after audio
+        trial = recorder.start_trial(
+            TrialType.MOTOR_IMAGERY_LEFT,
+            block_number=1,
+            notes=f"Left motor imagery - Round {rep + 1}"
+        )
+        
+        # Show visual cue
+        instruction_text.text = "IMAGINE LEFT HAND MOVEMENT\nPress SPACE when you finish imagining"
+        instruction_text.color = left_color
+        show_cue("left", left_color, "← LEFT")
+        
+        # Wait for participant to press SPACE
+        if not wait_for_keypress('space'):
+            experiment_aborted = True
+            break
+        
+        # End trial
+        recorder.end_trial()
+        left_completed += 1
+        
+        # Update progress
+        total_done = left_completed + right_completed
+        progress_text.text = f"Progress: {total_done}/{total_trials} trials | Round {rep + 1}/{NUM_REPETITIONS}"
+        
+        # Rest period
+        if not show_rest_countdown(REST_DURATION):
+            experiment_aborted = True
+            break
+        
+        # ===== RIGHT TRIAL =====
+        # Show preparing screen
+        show_instruction_screen(f"Round {rep + 1}/{NUM_REPETITIONS}: RIGHT motor imagery\n\nListen to the audio instruction...", right_color)
+        core.wait(0.5)
+        
+        # Play audio instruction (blocking)
+        speak_text(RIGHT_INSTRUCTION, wait=True)
+        
+        # Start RIGHT trial immediately after audio
+        trial = recorder.start_trial(
+            TrialType.MOTOR_IMAGERY_RIGHT,
+            block_number=1,
+            notes=f"Right motor imagery - Round {rep + 1}"
+        )
+        
+        # Show visual cue
+        instruction_text.text = "IMAGINE RIGHT HAND MOVEMENT\nPress SPACE when you finish imagining"
+        instruction_text.color = right_color
+        show_cue("right", right_color, "RIGHT →")
+        
+        # Wait for participant to press SPACE
+        if not wait_for_keypress('space'):
+            experiment_aborted = True
+            break
+        
+        # End trial
+        recorder.end_trial()
+        right_completed += 1
+        
+        # Update progress
+        total_done = left_completed + right_completed
+        progress_text.text = f"Progress: {total_done}/{total_trials} trials | Round {rep + 1}/{NUM_REPETITIONS}"
+        
+        # Rest period (skip after last trial - will have rest before blink block)
+        if rep < NUM_REPETITIONS - 1:
+            if not show_rest_countdown(REST_DURATION):
+                experiment_aborted = True
+                break
+    
+    # ========== PHASE 4: Blink Block ==========
+    blinks_completed = 0
+    
+    if not experiment_aborted:
+        # Rest before blink block
+        if not show_rest_countdown(REST_DURATION):
+            experiment_aborted = True
+        
+        if not experiment_aborted:
+            # Blink block instruction
+            BLINK_INSTRUCTION = "Now we will record intentional blinks. When you hear the beep or see the prompt, blink deliberately once. Press B to record each blink."
+            
+            progress_text.text = f"Motor Imagery Complete! | Now: Blink Block (0/{TARGET_BLINKS})"
+            show_instruction_screen(f"BLINK BLOCK\n\nWe will now record {TARGET_BLINKS} intentional blinks.\nPress 'B' each time you blink deliberately.\n\nListen to the instruction...", warning_color)
+            core.wait(0.5)
+            
+            # Play audio instruction
+            speak_text(BLINK_INSTRUCTION, wait=True)
+            
+            # Blink collection loop
+            instruction_text.text = f"Press 'B' when you blink intentionally\nBlinks recorded: {blinks_completed}/{TARGET_BLINKS}\n\nPress ENTER when done with all blinks"
+            instruction_text.color = warning_color
+            
+            while blinks_completed < TARGET_BLINKS and not experiment_aborted:
+                # Update display
+                progress_text.text = f"Blink Block | Blinks: {blinks_completed}/{TARGET_BLINKS}"
+                instruction_text.text = f"Press 'B' when you blink intentionally\nBlinks recorded: {blinks_completed}/{TARGET_BLINKS}\n\nPress ENTER when done with all blinks"
+                
+                status_box.draw()
+                status_text.draw()
+                title.draw()
+                progress_text.draw()
+                instruction_text.draw()
+                recording_dot.draw()
+                win.flip()
+                
+                keys = event.getKeys()
+                
+                if 'escape' in keys:
+                    experiment_aborted = True
+                    break
+                elif 'return' in keys:
+                    # Allow early exit from blink block
+                    break
+                elif 'b' in keys:
+                    # Record intentional blink
+                    if recorder.add_blink_marker():
+                        blinks_completed += 1
+                        # Brief feedback
+                        instruction_text.text = f"Blink recorded! ({blinks_completed}/{TARGET_BLINKS})"
+                        instruction_text.color = success_color
+                        status_box.draw()
+                        status_text.draw()
+                        title.draw()
+                        progress_text.draw()
+                        instruction_text.draw()
+                        recording_dot.draw()
+                        win.flip()
+                        core.wait(0.3)
+                        instruction_text.color = warning_color
+                
+                core.wait(0.01)
+    
+    # ========== PHASE 5: Completion ==========
+    if experiment_aborted:
+        instruction_text.text = "Experiment aborted. Saving data..."
+        instruction_text.color = warning_color
+    else:
+        instruction_text.text = f"Experiment Complete!\n\nCompleted {left_completed} LEFT, {right_completed} RIGHT trials\nand {blinks_completed} intentional blinks.\n\nSaving data..."
+        instruction_text.color = success_color
+        speak_text("Experiment complete. Thank you for participating.", wait=False)
+    
+    status_box.draw()
+    status_text.draw()
+    title.draw()
+    instruction_text.draw()
+    progress_text.draw()
+    win.flip()
+    
+    # Cleanup
+    recorder.stop_recording()
+    recorder.stop_streaming()
+    recorder.disconnect()
+    
+    # Show final message
+    instruction_text.text = f"Data saved!\n\nEEG data: {recorder.eeg_output_file}\nTrial log: {recorder.trial_log_file}\n\nPress ESC to exit."
+    status_box.draw()
+    status_text.draw()
+    title.draw()
+    instruction_text.draw()
+    win.flip()
+    
+    # Wait for ESC to close
+    while 'escape' not in event.getKeys():
+        core.wait(0.1)
     
     win.close()
     core.quit()
