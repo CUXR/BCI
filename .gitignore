@@ -216,3 +216,7 @@ __marimo__/
 # For this project
 temp/
 *.DS_Store
+
+# Private documents (not for GitHub)
+TEAM.md
+TODO.md

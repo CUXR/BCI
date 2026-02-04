@@ -5,3 +5,4 @@ PyQt6
 mne
 scipy
 matplotlib
+psychopy>=2024.0.0
