@@ -15,7 +15,9 @@ BCI-VR Navigation Control: Decodes left/right motor imagery and intentional blin
 pip install -r requirements.txt
 
 # Run the main experiment (requires Muse headband connected)
-python src/psychopy_recording/muse_psychopy_recording_structured.py
+python src/psychopy_recording/muse_psychopy_recording_structured.py --name <name> --number <subject_number>
+# e.g. python src/psychopy_recording/muse_psychopy_recording_structured.py --name alan --number 6
+# Creates data/sub06/metadata.yaml automatically
 
 # Run cross-subject analysis
 python data/analyze_all.py
