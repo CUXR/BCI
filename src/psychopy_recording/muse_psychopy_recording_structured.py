@@ -5,7 +5,7 @@ and experiment procedure per EXPERIMENT_PROCEDURE.md
 
 Structured experiment flow:
 1. Connect to Muse and start recording
-2. Loop 3 times (LEFT, RIGHT alternating):
+2. Loop 5 times (LEFT, RIGHT alternating):
    - Play audio instruction for LEFT/RIGHT via TTS
    - Recording starts immediately after instruction
    - Participant imagines the movement
@@ -176,7 +176,7 @@ class Trial:
 class MusePsychopyRecorder:
     """Records MUSE EEG data with markers and trial log in Psychopy experiment."""
     
-    def __init__(self, output_dir=None, participant_id=None, blink_window_ms=200):
+    def __init__(self, output_dir=None, participant_id=None, blink_window_ms=500):
         """Initialize the recorder.
         
         Args:
@@ -185,7 +185,7 @@ class MusePsychopyRecorder:
             blink_window_ms: Window size in ms for blink extraction (±window_ms around event)
         """
         if output_dir is None:
-            output_dir = os.path.join(os.path.expanduser("~"), "MuseEEG", "psychopy")
+            output_dir = os.path.join("data", "sub03")
         os.makedirs(output_dir, exist_ok=True)
         
         # Create output filenames with timestamp
@@ -712,7 +712,7 @@ def run_experiment():
     Experiment Flow:
     1. Press SPACE to connect to Muse
     2. Press ENTER to start the structured experiment
-    3. Automated loop (3 repetitions of LEFT + RIGHT):
+    3. Automated loop (10 repetitions of LEFT + RIGHT):
        - Audio instruction for LEFT -> Recording starts -> Press SPACE when done -> 5s rest
        - Audio instruction for RIGHT -> Recording starts -> Press SPACE when done -> 5s rest
     4. Blink block: Press B for each intentional blink (10 blinks target)
@@ -721,10 +721,10 @@ def run_experiment():
     Press ESC at any time to abort and save data.
     """
     # Create recorder
-    recorder = MusePsychopyRecorder(blink_window_ms=200)  # ±200ms window
+    recorder = MusePsychopyRecorder(blink_window_ms=500)  # ±500ms window
     
     # Experiment parameters
-    NUM_REPETITIONS = 3  # Number of LEFT/RIGHT pairs
+    NUM_REPETITIONS = 10  # Number of LEFT/RIGHT pairs
     REST_DURATION = 5.0  # Rest period in seconds
     TARGET_BLINKS = 10   # Number of intentional blinks to collect
     
@@ -936,7 +936,7 @@ def run_experiment():
         core.wait(0.01)
     
     # ========== PHASE 2: Start Experiment ==========
-    instruction_text.text = "Connected!\n\nPress ENTER to start the structured experiment\n\nYou will do 3 rounds of LEFT and RIGHT motor imagery,\nfollowed by a blink recording session.\nAudio instructions will guide you.\nPress SPACE when you finish each imagery task."
+    instruction_text.text = "Connected!\n\nPress ENTER to start the structured experiment\n\nYou will do 5 rounds of LEFT and RIGHT motor imagery,\nfollowed by a blink recording session.\nAudio instructions will guide you.\nPress SPACE when you finish each imagery task."
     instruction_text.color = success_color
     status_box.draw()
     status_text.draw()
