@@ -5,7 +5,7 @@ Trains on all available subject data and saves a model bundle:
   - Motor imagery: RF on all 4 channels (best cross-subject generalization)
 
 Usage:
-    python src/train_and_save_models.py
+    python src/realtime_feedback/train_and_save_models.py
 
 Output:
     models/realtime_models.pkl
@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 import mne
 mne.set_log_level("ERROR")
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from training.bandpower import train_motor_imagery as mi_mod
