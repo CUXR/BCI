@@ -1,20 +1,16 @@
-"""Motor Imagery Classification Pipeline — v3: Time-Frequency + EEGNet Features.
+"""Motor Imagery Classification Pipeline — v2: Time-Frequency Features.
 
-Builds on v2 by adding an EEGNet-inspired fixed (non-trained) feature extractor.
-The EEGNet architecture mirrors classical EEG processing:
-  temporal filtering (sinc bandpass) → spatial filtering (L-R contrasts)
-  → temporal summarization → feature vector
+Builds on v1 (spectral/time-domain + CSP) by adding sliding-window
+time-frequency features that capture ERD/ERS temporal dynamics.
 
-All weights are analytically initialized and frozen — no gradient-based training.
-
-New features vs v2:
-  - EEGNet forward-pass features from biologically-informed architecture
-
-Requires: torch>=2.0.0
+New features vs v1:
+  - Sliding window band power (1s window, 0.5s step) in mu, beta, low-beta, high-beta
+  - Temporal statistics per band per channel: mean, std, slope, range
+  - Lateralization asymmetry time series (TP9↔TP10) with mean/std/slope
 
 Run:
   source /opt/anaconda3/etc/profile.d/conda.sh && conda activate muse
-  python src/train_motor_imagery_v3_eegnet.py
+  python src/training/timefreq/train_motor_imagery_v2_timefreq.py
 """
 
 import sys
@@ -34,14 +30,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 
-import torch
-import torch.nn as nn
-
 warnings.filterwarnings("ignore")
 import mne
 mne.set_log_level("ERROR")
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from eeg_filters import EEGFilter
@@ -75,7 +68,6 @@ CHANNEL_CONFIGS = {
 MIN_EPOCH_SECONDS = 2.0
 MAX_EPOCH_SECONDS = 5.0
 ARTIFACT_THRESHOLD_UV = 200.0
-EEGNET_FIXED_LENGTH = int(5.0 * 256)  # 1280 samples at 256 Hz
 
 
 # ============================================================
@@ -232,7 +224,7 @@ def extract_mi_epochs(eeg, trials, fs, ch_indices, eeg_filter):
 
 
 # ============================================================
-# Feature extraction — v1 spectral/time-domain
+# Feature extraction — v1 spectral/time-domain (same as v1)
 # ============================================================
 
 def _bandpower(signal, fs, fmin, fmax):
@@ -329,7 +321,7 @@ def extract_features_all(epochs, fs, ch_indices):
 
 
 # ============================================================
-# v2: Time-frequency feature extraction
+# NEW: Time-frequency feature extraction (v2)
 # ============================================================
 
 def extract_timefreq_features(epoch, fs, ch_indices):
@@ -338,13 +330,23 @@ def extract_timefreq_features(epoch, fs, ch_indices):
     Uses a 1s window with 0.5s step to compute band power over time,
     then derives temporal statistics (mean, std, slope, range) that
     capture ERD/ERS dynamics.
+
+    Args:
+        epoch: (n_samples, n_channels) array
+        fs: sampling rate in Hz
+        ch_indices: list of global channel indices used
+
+    Returns:
+        1D feature vector
     """
     n_samples, n_ch = epoch.shape
-    win_samples = int(1.0 * fs)
-    step_samples = int(0.5 * fs)
+    win_samples = int(1.0 * fs)   # 1s window
+    step_samples = int(0.5 * fs)  # 0.5s step
 
+    # Build window start indices
     starts = list(range(0, n_samples - win_samples + 1, step_samples))
     if len(starts) < 2:
+        # Epoch too short for sliding window — fall back to single window
         starts = [0]
         win_samples = n_samples
 
@@ -352,6 +354,7 @@ def extract_timefreq_features(epoch, fs, ch_indices):
     band_names = list(TIMEFREQ_BANDS.keys())
     n_bands = len(band_names)
 
+    # Compute band power per window per channel: shape (n_windows, n_ch, n_bands)
     bp_array = np.zeros((n_windows, n_ch, n_bands))
     for w_i, start in enumerate(starts):
         window = epoch[start:start + win_samples]
@@ -363,12 +366,15 @@ def extract_timefreq_features(epoch, fs, ch_indices):
 
     features = []
 
+    # Per-channel, per-band temporal statistics
     for ch_i in range(n_ch):
         for b_i in range(n_bands):
             series = bp_array[:, ch_i, b_i]
             features.append(np.mean(series))
             features.append(np.std(series))
+            # Range (max - min)
             features.append(np.ptp(series))
+            # Slope via linear regression over window indices
             if len(series) >= 2:
                 x = np.arange(len(series))
                 slope = linregress(x, series).slope
@@ -376,6 +382,7 @@ def extract_timefreq_features(epoch, fs, ch_indices):
                 slope = 0.0
             features.append(slope)
 
+    # Lateralization asymmetry time series for TP9↔TP10 pair
     pairs = []
     if 0 in ch_indices and 3 in ch_indices:
         l_idx = ch_indices.index(0)
@@ -405,258 +412,11 @@ def extract_timefreq_features(epoch, fs, ch_indices):
 
 
 def extract_timefreq_all(epochs, fs, ch_indices):
+    """Extract time-frequency features from all epochs."""
     if not epochs:
         return np.empty((0, 0))
     X = np.array([extract_timefreq_features(ep, fs, ch_indices)
                   for ep in epochs])
-    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-    return X
-
-
-# ============================================================
-# v3: EEGNet-inspired fixed feature extractor
-# ============================================================
-
-def _sinc_bandpass(fmin, fmax, fs, kernel_size):
-    """Construct a sinc bandpass filter with Hamming window.
-
-    Returns a 1D numpy array of length kernel_size.
-    """
-    n = np.arange(kernel_size) - (kernel_size - 1) / 2
-    t = n / fs
-    # sinc bandpass = highpass(fmin) subtracted from lowpass(fmax)
-    h = 2 * fmax * np.sinc(2 * fmax * t) - 2 * fmin * np.sinc(2 * fmin * t)
-    h *= np.hamming(kernel_size)
-    h /= np.sum(np.abs(h)) + 1e-12
-    return h
-
-
-class EEGNetFeatureExtractor(nn.Module):
-    """EEGNet-inspired fixed feature extractor (no training).
-
-    Architecture (adapted for 4-channel Muse 2):
-      Block 1 — Temporal Conv: F1=8 sinc bandpass filters, kernel (1, 128)
-      Block 1 — Depthwise Spatial Conv: D=2 per temporal filter, kernel (C, 1)
-      Block 2 — Separable Conv: depthwise (1, 16) + pointwise (1, 1)
-      Average pooling → flatten → feature vector
-
-    All weights are analytically initialized and frozen.
-
-    Args:
-        n_channels: number of EEG channels
-        n_samples: fixed input length in samples (epochs padded to this)
-        fs: sampling rate in Hz
-        ch_indices: list of global channel indices (for spatial filter init)
-    """
-
-    # Center frequencies for 8 sinc bandpass filters
-    FILTER_BANDS = [
-        (4, 8),    # theta
-        (6, 10),   # theta-alpha transition
-        (8, 12),   # mu / alpha
-        (10, 14),  # upper alpha / low beta transition
-        (13, 20),  # low beta
-        (15, 25),  # mid beta
-        (20, 30),  # high beta
-        (8, 30),   # broad alpha-beta
-    ]
-
-    def __init__(self, n_channels, n_samples, fs=256.0, ch_indices=None):
-        super().__init__()
-        self.n_channels = n_channels
-        self.n_samples = n_samples
-        self.fs = fs
-        self.ch_indices = ch_indices or list(range(n_channels))
-
-        F1 = 8   # temporal filters
-        D = 2    # spatial filters per temporal filter
-        F2 = F1 * D  # = 16
-
-        # Block 1: Temporal convolution (sinc bandpass filters)
-        temporal_kernel = 128  # 0.5s at 256 Hz
-        self.temporal_conv = nn.Conv2d(
-            1, F1, (1, temporal_kernel), padding=(0, temporal_kernel // 2),
-            bias=False)
-        self._init_sinc_filters(temporal_kernel)
-
-        # Block 1: Batch norm after temporal conv
-        self.bn1 = nn.BatchNorm2d(F1, affine=False)
-
-        # Block 1: Depthwise spatial convolution
-        self.spatial_conv = nn.Conv2d(
-            F1, F2, (n_channels, 1), groups=F1, bias=False)
-        self._init_spatial_filters()
-
-        self.bn2 = nn.BatchNorm2d(F2, affine=False)
-
-        # Block 2: Separable conv = depthwise temporal + pointwise
-        sep_kernel = 16
-        self.sep_depthwise = nn.Conv2d(
-            F2, F2, (1, sep_kernel), groups=F2,
-            padding=(0, sep_kernel // 2), bias=False)
-        self._init_sep_depthwise(sep_kernel)
-
-        self.sep_pointwise = nn.Conv2d(F2, F2, (1, 1), bias=False)
-        self._init_sep_pointwise()
-
-        self.bn3 = nn.BatchNorm2d(F2, affine=False)
-
-        # Average pooling
-        self.avg_pool1 = nn.AvgPool2d((1, 4))
-        self.avg_pool2 = nn.AvgPool2d((1, 8))
-
-        self.elu = nn.ELU()
-
-        # Freeze all parameters
-        for param in self.parameters():
-            param.requires_grad = False
-
-        # Compute output size
-        self._output_size = self._compute_output_size()
-
-    def _init_sinc_filters(self, kernel_size):
-        """Initialize temporal conv with sinc bandpass filters."""
-        weight = self.temporal_conv.weight.data  # (F1, 1, 1, kernel_size)
-        for i, (fmin, fmax) in enumerate(self.FILTER_BANDS):
-            h = _sinc_bandpass(fmin, fmax, self.fs, kernel_size)
-            weight[i, 0, 0, :] = torch.from_numpy(h).float()
-
-    def _init_spatial_filters(self):
-        """Initialize depthwise spatial conv with L-R contrast filters.
-
-        For each temporal filter, D=2 spatial filters:
-          [0]: L-R temporal contrast [TP9 - TP10] = [1, 0, 0, -1]
-          [1]: L-R frontal contrast  [AF7 - AF8]  = [0, 1, -1, 0]
-
-        Adapted for arbitrary channel subsets.
-        """
-        weight = self.spatial_conv.weight.data  # (F2, 1, n_ch, 1)
-        weight.zero_()
-
-        # Map global channel indices to local positions
-        ch_map = {g: l for l, g in enumerate(self.ch_indices)}
-
-        for f in range(8):  # F1 = 8 temporal filters
-            # First spatial filter: temporal L-R (TP9 - TP10)
-            idx_0 = f * 2
-            if 0 in ch_map and 3 in ch_map:
-                weight[idx_0, 0, ch_map[0], 0] = 1.0   # TP9
-                weight[idx_0, 0, ch_map[3], 0] = -1.0   # TP10
-            elif 0 in ch_map:
-                weight[idx_0, 0, ch_map[0], 0] = 1.0
-            elif 3 in ch_map:
-                weight[idx_0, 0, ch_map[3], 0] = 1.0
-            else:
-                # Fallback: uniform average
-                weight[idx_0, 0, :, 0] = 1.0 / self.n_channels
-
-            # Second spatial filter: frontal L-R (AF7 - AF8)
-            idx_1 = f * 2 + 1
-            if 1 in ch_map and 2 in ch_map:
-                weight[idx_1, 0, ch_map[1], 0] = 1.0    # AF7
-                weight[idx_1, 0, ch_map[2], 0] = -1.0    # AF8
-            elif 1 in ch_map:
-                weight[idx_1, 0, ch_map[1], 0] = 1.0
-            elif 2 in ch_map:
-                weight[idx_1, 0, ch_map[2], 0] = 1.0
-            else:
-                # Fallback: uniform average
-                weight[idx_1, 0, :, 0] = 1.0 / self.n_channels
-
-    def _init_sep_depthwise(self, kernel_size):
-        """Initialize separable depthwise conv with averaging kernel."""
-        weight = self.sep_depthwise.weight.data  # (F2, 1, 1, kernel_size)
-        weight.fill_(1.0 / kernel_size)
-
-    def _init_sep_pointwise(self):
-        """Initialize pointwise conv as identity."""
-        weight = self.sep_pointwise.weight.data  # (F2, F2, 1, 1)
-        nn.init.eye_(weight.squeeze())
-        weight.copy_(weight.view(weight.shape))
-
-    def _compute_output_size(self):
-        """Run a dummy forward pass to determine output feature size."""
-        with torch.no_grad():
-            dummy = torch.zeros(1, 1, self.n_channels, self.n_samples)
-            out = self._forward_impl(dummy)
-            return out.shape[1]
-
-    def _forward_impl(self, x):
-        """Forward pass implementation.
-
-        Args:
-            x: (batch, 1, n_channels, n_samples)
-        Returns:
-            (batch, n_features) flattened feature vector
-        """
-        # Block 1: temporal filtering
-        x = self.temporal_conv(x)
-        x = self.bn1(x)
-
-        # Block 1: spatial filtering
-        x = self.spatial_conv(x)
-        x = self.bn2(x)
-        x = self.elu(x)
-        x = self.avg_pool1(x)
-
-        # Block 2: separable conv
-        x = self.sep_depthwise(x)
-        x = self.sep_pointwise(x)
-        x = self.bn3(x)
-        x = self.elu(x)
-        x = self.avg_pool2(x)
-
-        # Flatten
-        x = x.view(x.size(0), -1)
-        return x
-
-    def forward(self, x):
-        return self._forward_impl(x)
-
-    @property
-    def output_size(self):
-        return self._output_size
-
-
-def extract_eegnet_features_all(epochs, fs, ch_indices):
-    """Extract EEGNet features from all epochs.
-
-    Each epoch is padded/truncated to EEGNET_FIXED_LENGTH, reshaped to
-    (1, 1, n_channels, n_samples), and passed through the frozen EEGNet.
-
-    Returns:
-        X_eegnet: (n_epochs, n_eegnet_features) array
-    """
-    if not epochs:
-        return np.empty((0, 0))
-
-    n_ch = epochs[0].shape[1]
-    target_len = EEGNET_FIXED_LENGTH
-
-    # Build the model once
-    model = EEGNetFeatureExtractor(
-        n_channels=n_ch, n_samples=target_len, fs=fs, ch_indices=ch_indices)
-    model.eval()
-
-    features_list = []
-
-    with torch.no_grad():
-        for ep in epochs:
-            # Pad or truncate to fixed length
-            n_samples = ep.shape[0]
-            if n_samples < target_len:
-                pad_width = ((0, target_len - n_samples), (0, 0))
-                ep_fixed = np.pad(ep, pad_width, mode="edge")
-            else:
-                ep_fixed = ep[:target_len]
-
-            # Reshape to (1, 1, n_channels, n_samples) — batch, 1 "image channel",
-            # EEG channels, time
-            x = torch.from_numpy(ep_fixed.T[np.newaxis, np.newaxis, :, :]).float()
-            feat = model(x).numpy().flatten()
-            features_list.append(feat)
-
-    X = np.array(features_list)
     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     return X
 
@@ -784,12 +544,12 @@ def evaluate_loso(X, y, subject_ids, classifiers):
 
 
 # ============================================================
-# Main pipeline (v3: spectral + time-frequency + EEGNet + CSP)
+# Main pipeline (v2: spectral + time-frequency + CSP)
 # ============================================================
 
 def run_pipeline():
     print("=" * 70)
-    print("Motor Imagery Classification Pipeline — v3 (Time-Freq + EEGNet)")
+    print("Motor Imagery Classification Pipeline — v2 (Time-Frequency)")
     print("=" * 70)
 
     subjects = find_subject_data(DATA_DIR)
@@ -897,16 +657,12 @@ def run_pipeline():
         X_timefreq = extract_timefreq_all(padded_epochs, fs, ch_indices)
         csp_features, W_csp = compute_csp(padded_epochs, all_labels)
 
-        print(f"\n  Extracting EEGNet features (fixed, no training)...")
-        X_eegnet = extract_eegnet_features_all(padded_epochs, fs, ch_indices)
-
-        X = np.hstack([X_feat, X_timefreq, csp_features, X_eegnet])
+        X = np.hstack([X_feat, X_timefreq, csp_features])
 
         print(f"\n  Feature matrix: {X.shape[0]} epochs x {X.shape[1]} features")
         print(f"    Spectral/time features: {X_feat.shape[1]}")
-        print(f"    Time-frequency features: {X_timefreq.shape[1]}  [v2]")
+        print(f"    Time-frequency features: {X_timefreq.shape[1]}  [NEW in v2]")
         print(f"    CSP features: {csp_features.shape[1]}")
-        print(f"    EEGNet features: {X_eegnet.shape[1]}  [NEW in v3]")
         print(f"    Class balance: L={np.sum(y == 0)}, R={np.sum(y == 1)}")
 
         classifiers = get_classifiers()
@@ -954,7 +710,6 @@ def run_pipeline():
             "n_spectral_features": X_feat.shape[1],
             "n_timefreq_features": X_timefreq.shape[1],
             "n_csp_features": csp_features.shape[1],
-            "n_eegnet_features": X_eegnet.shape[1],
             "within_subject": {
                 sub: {clf: float(f"{acc:.4f}") if not np.isnan(acc) else None
                       for clf, acc in accs.items()}
@@ -977,7 +732,7 @@ def run_pipeline():
 
     # --- Summary ---
     print(f"\n{'=' * 70}")
-    print("SUMMARY — Best Configurations (v3: Time-Freq + EEGNet)")
+    print("SUMMARY — Best Configurations (v2: with Time-Frequency)")
     print("=" * 70)
 
     best_ws_acc = 0
@@ -1003,9 +758,9 @@ def run_pipeline():
           f"channels — {best_loso_acc:.1%}")
 
     # Save results
-    results_file = DATA_DIR / "classification_results_v3.json"
+    results_file = DATA_DIR / "classification_results_v2.json"
     output = {
-        "pipeline_version": "v3_eegnet",
+        "pipeline_version": "v2_timefreq",
         "channel_quality": {
             sub: {ch: {k: float(f"{v:.6f}") if isinstance(v, float) else v
                        for k, v in metrics.items()}
