@@ -22,6 +22,7 @@ import threading
 import csv
 import subprocess
 import platform
+import argparse
 from datetime import datetime
 from pathlib import Path
 from enum import Enum
@@ -176,17 +177,28 @@ class Trial:
 class MusePsychopyRecorder:
     """Records MUSE EEG data with markers and trial log in Psychopy experiment."""
     
-    def __init__(self, output_dir=None, participant_id=None, blink_window_ms=500):
+    def __init__(self, output_dir=None, participant_id=None, subject_name=None,
+                 subject_number=None, blink_window_ms=500):
         """Initialize the recorder.
-        
+
         Args:
-            output_dir: Directory to save output files. Defaults to ~/MuseEEG/psychopy
+            output_dir: Directory to save output files. Auto-derived from subject_number if not given.
             participant_id: Optional participant identifier
+            subject_name: Participant name (for metadata.yaml)
+            subject_number: Subject number, e.g. 6 -> data/sub06/
             blink_window_ms: Window size in ms for blink extraction (±window_ms around event)
         """
         if output_dir is None:
-            output_dir = os.path.join("data", "sub03")
+            sub_label = f"sub{subject_number:02d}" if subject_number is not None else "sub00"
+            output_dir = os.path.join("data", sub_label)
         os.makedirs(output_dir, exist_ok=True)
+
+        # Write metadata.yaml
+        metadata_path = os.path.join(output_dir, "metadata.yaml")
+        with open(metadata_path, "w") as f:
+            f.write(f"date: {datetime.now().strftime('%Y-%m-%d')}\n")
+            f.write(f"participant: {subject_name or participant_id or 'unknown'}\n")
+        print(f"Metadata saved to {metadata_path}")
         
         # Create output filenames with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -708,7 +720,7 @@ class MusePsychopyRecorder:
 
 def run_experiment():
     """Run the structured Psychopy experiment with TTS audio instructions.
-    
+
     Experiment Flow:
     1. Press SPACE to connect to Muse
     2. Press ENTER to start the structured experiment
@@ -717,11 +729,22 @@ def run_experiment():
        - Audio instruction for RIGHT -> Recording starts -> Press SPACE when done -> 5s rest
     4. Blink block: Press B for each intentional blink (10 blinks target)
     5. Data saved automatically at end
-    
+
     Press ESC at any time to abort and save data.
     """
+    # Parse CLI arguments
+    parser = argparse.ArgumentParser(description="Muse EEG Motor Imagery Experiment")
+    parser.add_argument("--name", required=True, help="Subject's name")
+    parser.add_argument("--number", type=int, required=True, help="Subject number (e.g. 6)")
+    args = parser.parse_args()
+
     # Create recorder
-    recorder = MusePsychopyRecorder(blink_window_ms=500)  # ±500ms window
+    recorder = MusePsychopyRecorder(
+        subject_name=args.name,
+        subject_number=args.number,
+        participant_id=args.name,
+        blink_window_ms=500,
+    )
     
     # Experiment parameters
     NUM_REPETITIONS = 10  # Number of LEFT/RIGHT pairs
