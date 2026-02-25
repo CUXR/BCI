@@ -10,11 +10,17 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 dependencies = [
-    "numpy",
     "brainflow",
+    "numpy",
     "pyqtgraph",
     "PyQt6",
     "mne",
+    "scipy",
+    "matplotlib",
+    "psychopy",
+    "scikit-learn",
+    "pandas",
+    "torch",
 ]
 
 

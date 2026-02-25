@@ -220,3 +220,4 @@ temp/
 # Private documents (not for GitHub)
 TEAM.md
 TODO.md
+.claude/
