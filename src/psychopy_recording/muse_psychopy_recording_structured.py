@@ -973,9 +973,11 @@ def run_experiment():
     status_text.color = success_color
     
     # ========== PHASE 3: Main Experiment Loop ==========
-    # Audio instructions
-    LEFT_INSTRUCTION = "Now, imagine reaching out with your left hand to grab a cup on your left side. Focus on the sensation of your left hand moving."
-    RIGHT_INSTRUCTION = "Now, imagine reaching out with your right hand to grab a cup on your right side. Focus on the sensation of your right hand moving."
+    # Audio instructions: full for first trial, short "grab left/right" for trials 2–10
+    LEFT_INSTRUCTION_FULL = "Now, imagine reaching out with your left hand to grab a cup on your left side. Focus on the sensation of your left hand moving."
+    RIGHT_INSTRUCTION_FULL = "Now, imagine reaching out with your right hand to grab a cup on your right side. Focus on the sensation of your right hand moving."
+    LEFT_INSTRUCTION_SHORT = "Grab left"
+    RIGHT_INSTRUCTION_SHORT = "Grab right"
     
     left_completed = 0
     right_completed = 0
@@ -996,8 +998,9 @@ def run_experiment():
         show_instruction_screen(f"Round {rep + 1}/{NUM_REPETITIONS}: LEFT motor imagery\n\nListen to the audio instruction...", left_color)
         core.wait(0.5)
         
-        # Play audio instruction (blocking - waits until speech is done)
-        speak_text(LEFT_INSTRUCTION, wait=True)
+        # Play audio instruction (blocking - waits until speech is done). First trial: full; trials 2–10: "Grab left"
+        left_instruction = LEFT_INSTRUCTION_FULL if rep == 0 else LEFT_INSTRUCTION_SHORT
+        speak_text(left_instruction, wait=True)
         
         # Start LEFT trial immediately after audio
         trial = recorder.start_trial(
@@ -1034,8 +1037,9 @@ def run_experiment():
         show_instruction_screen(f"Round {rep + 1}/{NUM_REPETITIONS}: RIGHT motor imagery\n\nListen to the audio instruction...", right_color)
         core.wait(0.5)
         
-        # Play audio instruction (blocking)
-        speak_text(RIGHT_INSTRUCTION, wait=True)
+        # Play audio instruction (blocking). First trial: full; trials 2–10: "Grab right"
+        right_instruction = RIGHT_INSTRUCTION_FULL if rep == 0 else RIGHT_INSTRUCTION_SHORT
+        speak_text(right_instruction, wait=True)
         
         # Start RIGHT trial immediately after audio
         trial = recorder.start_trial(
