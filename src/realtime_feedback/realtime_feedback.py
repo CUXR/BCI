@@ -4,11 +4,11 @@ Connects to Muse 2 via BrainFlow, processes EEG in real-time, and displays
 brain state predictions (blink detection + motor imagery L/R) in a PyQt6 GUI.
 
 Prerequisites:
-    python src/train_and_save_models.py   # Train and save models first
+    python src/realtime_feedback/train_and_save_models.py
 
 Usage:
-    python src/realtime_feedback.py              # Live Muse 2
-    python src/realtime_feedback.py --simulate   # Synthetic data for testing
+    python src/realtime_feedback/realtime_feedback.py              # Live Muse 2
+    python src/realtime_feedback/realtime_feedback.py --simulate   # Synthetic data for testing
 """
 
 import sys
@@ -36,7 +36,7 @@ from brainflow.data_filter import DataFilter, DetrendOperations
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from eeg_filters import EEGFilter

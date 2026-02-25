@@ -3,6 +3,26 @@
 4 subjects (sub02–sub05), 77 motor imagery epochs, 190 blink epochs. Chance level: 50%.
 sub03 excluded from blink detection (0 blink epochs due to poor signal).
 
+## Evaluation Methods
+
+### Within-Subject CV (Cross-Validation)
+
+Evaluates how well a model works for a single person using their own data. Each subject's epochs are split into K folds (5-fold). The model trains on K-1 folds and tests on the remaining fold, rotating so every trial is tested exactly once. Per-subject accuracies are averaged. The "Mean Accuracy" tables report the average across all subjects.
+
+This answers: *"If I calibrate a model on a user's data, how well does it predict that user's new trials?"*
+
+### LOSO (Leave-One-Subject-Out)
+
+Evaluates cross-subject generalization — whether a model trained on other people works on a new person without any calibration. One subject is held out entirely, the model trains on all remaining subjects, and then tests on the held-out subject. This repeats for each subject, and accuracies are averaged.
+
+This answers: *"If a new user puts on the headband with zero calibration, how well will the model work?"*
+
+### Why Both Matter
+
+- **Within-Subject** is the realistic scenario with a short calibration session per user.
+- **LOSO** is the harder, zero-calibration scenario.
+- The drop from within-subject to LOSO reflects how much individual variation exists in the signal. A small drop (like blink detection: 88.7% → 86.0%) means the signal is consistent across people. A large drop (like motor imagery: ~61% → ~62% but both near chance) means high person-to-person variability.
+
 ---
 
 ## Motor Imagery (Left vs Right)
