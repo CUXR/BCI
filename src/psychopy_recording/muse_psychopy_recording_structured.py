@@ -178,7 +178,7 @@ class MusePsychopyRecorder:
     """Records MUSE EEG data with markers and trial log in Psychopy experiment."""
     
     def __init__(self, output_dir=None, participant_id=None, subject_name=None,
-                 subject_number=None, blink_window_ms=500):
+                 subject_number=None, blink_window_ms=500, serial_number=None):
         """Initialize the recorder.
 
         Args:
@@ -187,6 +187,7 @@ class MusePsychopyRecorder:
             subject_name: Participant name (for metadata.yaml)
             subject_number: Subject number, e.g. 6 -> data/sub06/
             blink_window_ms: Window size in ms for blink extraction (±window_ms around event)
+            serial_number: Muse serial number to connect to a specific device
         """
         if output_dir is None:
             sub_label = f"sub{subject_number:02d}" if subject_number is not None else "sub00"
@@ -227,6 +228,7 @@ class MusePsychopyRecorder:
         
         # Board info (will be set after connection)
         self.board_id = BoardIds.MUSE_2_BOARD.value
+        self.serial_number = serial_number
         self.sampling_rate = None
         self.eeg_channels = None
         self.marker_channel = None
@@ -248,37 +250,51 @@ class MusePsychopyRecorder:
             'baseline_active': (4, 'baseline_active'),
         }
         
-    def connect(self):
-        """Connect to MUSE board."""
+    def connect(self, max_retries=3):
+        """Connect to MUSE board with automatic BLE retries."""
         if self.board is not None:
             print("Already connected.")
             return True
-            
-        print("Connecting to Muse2...")
-        try:
-            BoardShim.enable_board_logger()
-            
-            params = BrainFlowInputParams()
-            self.board = BoardShim(self.board_id, params)
-            self.board.prepare_session()
-            
-            # Get board channel info after connection
-            self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
-            self.eeg_channels = BoardShim.get_eeg_channels(self.board_id)
-            self.marker_channel = BoardShim.get_marker_channel(self.board_id)
-            self.timestamp_channel = BoardShim.get_timestamp_channel(self.board_id)
-            
-            print("Muse2 connected successfully.")
-            return True
-            
-        except BrainFlowError as e:
-            print(f"BrainFlow error: {e}")
-            self.board = None
-            return False
-        except Exception as e:
-            print(f"Unexpected error while connecting: {e}")
-            self.board = None
-            return False
+
+        device_label = f"Muse2 (serial={self.serial_number})" if self.serial_number else "Muse2"
+        BoardShim.enable_board_logger()
+
+        for attempt in range(1, max_retries + 1):
+            print(f"Connecting to {device_label}... (attempt {attempt}/{max_retries})")
+            try:
+                params = BrainFlowInputParams()
+                if self.serial_number:
+                    params.serial_number = self.serial_number
+                board = BoardShim(self.board_id, params)
+                board.prepare_session()
+
+                # Get board channel info after connection
+                self.board = board
+                self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
+                self.eeg_channels = BoardShim.get_eeg_channels(self.board_id)
+                self.marker_channel = BoardShim.get_marker_channel(self.board_id)
+                self.timestamp_channel = BoardShim.get_timestamp_channel(self.board_id)
+
+                print(f"{device_label} connected successfully.")
+                return True
+
+            except BrainFlowError as e:
+                print(f"BrainFlow error on attempt {attempt}: {e}")
+                try:
+                    board.release_session()
+                except Exception:
+                    pass
+                if attempt < max_retries:
+                    print("Retrying...")
+                    time.sleep(1)
+            except Exception as e:
+                print(f"Unexpected error on attempt {attempt}: {e}")
+                if attempt < max_retries:
+                    time.sleep(1)
+
+        print(f"Failed to connect to {device_label} after {max_retries} attempts.")
+        self.board = None
+        return False
     
     def disconnect(self):
         """Disconnect from MUSE board."""
@@ -736,15 +752,14 @@ def run_experiment():
     parser = argparse.ArgumentParser(description="Muse EEG Motor Imagery Experiment")
     parser.add_argument("--name", required=True, help="Subject's name")
     parser.add_argument("--number", type=int, required=True, help="Subject number (e.g. 6)")
+    parser.add_argument("--serial", type=str, default=None,
+                        help="Muse serial number (skip device selection screen)")
     args = parser.parse_args()
 
-    # Create recorder
-    recorder = MusePsychopyRecorder(
-        subject_name=args.name,
-        subject_number=args.number,
-        participant_id=args.name,
-        blink_window_ms=500,
-    )
+    selected_serial = args.serial  # May be None; will prompt in-app if so
+    # Accept short form (e.g. "15C3") or full form ("Muse-15C3")
+    if selected_serial and not selected_serial.startswith("Muse-"):
+        selected_serial = f"Muse-{selected_serial}"
     
     # Experiment parameters
     NUM_REPETITIONS = 10  # Number of LEFT/RIGHT pairs
@@ -923,8 +938,59 @@ def run_experiment():
                 return True
             core.wait(0.01)
     
+    # ========== PHASE 0: Device Selection ==========
+    # Known Muse 2 devices — use Bluetooth name (not hardware serial)
+    # The Muse broadcasts as "Muse-XXXX" over BLE; find yours in Bluetooth settings
+    MUSE_DEVICES = {
+        '1': ("Muse-15C3", "Muse #1 (15C3)"),
+        '2': ("Muse-12A6",  "Muse #2 (12A6)"),
+    }
+
+    if selected_serial is None:
+        device_lines = "\n".join(
+            f"Press {key} — {label}" for key, (_, label) in MUSE_DEVICES.items()
+        )
+        instruction_text.text = (
+            "Select which Muse headband to use:\n\n"
+            f"{device_lines}\n"
+            "Press 0 — Auto (connect to any available Muse)"
+        )
+        instruction_text.color = text_color
+        status_box.draw()
+        status_text.draw()
+        title.draw()
+        instruction_text.draw()
+        win.flip()
+
+        device_chosen = False
+        while not device_chosen:
+            keys = event.getKeys()
+            if 'escape' in keys:
+                win.close()
+                core.quit()
+                return
+            for key, (serial, _) in MUSE_DEVICES.items():
+                if key in keys:
+                    selected_serial = serial
+                    device_chosen = True
+                    break
+            if '0' in keys:
+                selected_serial = None  # auto-connect
+                device_chosen = True
+            core.wait(0.01)
+
+    # Create recorder with selected device
+    recorder = MusePsychopyRecorder(
+        subject_name=args.name,
+        subject_number=args.number,
+        participant_id=args.name,
+        blink_window_ms=500,
+        serial_number=selected_serial,
+    )
+
     # ========== PHASE 1: Connection ==========
-    instruction_text.text = "Press SPACE to connect to Muse headband"
+    device_label = f" ({selected_serial})" if selected_serial else ""
+    instruction_text.text = f"Press SPACE to connect to Muse headband{device_label}"
     instruction_text.color = text_color
     update_display()
     instruction_text.draw()
