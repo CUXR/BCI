@@ -26,7 +26,9 @@ conda activate muse
 pip install -r requirements.txt
 
 # 2. Collect data (requires Muse headband)
-python src/psychopy_recording/muse_psychopy_recording_structured.py
+#    --serial: Muse Bluetooth name (Muse-15C3 or Muse-12A6)
+#    Omit --serial to get an in-app device selection screen
+python src/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
 
 # 3. Train classifiers
 python src/realtime_feedback/train_and_save_models.py
