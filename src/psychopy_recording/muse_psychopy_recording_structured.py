@@ -763,7 +763,7 @@ def run_experiment():
     
     # Experiment parameters
     NUM_REPETITIONS = 10  # Number of LEFT/RIGHT pairs
-    REST_DURATION = 5.0  # Rest period in seconds
+    REST_DURATION = 3.0  # Rest period in seconds
     TARGET_BLINKS = 10   # Number of intentional blinks to collect
     
     # Create monitor specification
