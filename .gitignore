@@ -221,3 +221,5 @@ temp/
 TEAM.md
 TODO.md
 .claude/
+data
+src/psychopy_recording/data
