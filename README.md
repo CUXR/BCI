@@ -25,15 +25,21 @@ conda create -n muse python=3.11 -y
 conda activate muse
 pip install -r requirements.txt
 
-# 2. Collect data (requires Muse headband)
+# 2. Get the recorded data (NOT committed to this repo)
+#    Download the Muse_Data zip from Google Drive, then unzip into data/:
+#    https://drive.google.com/drive/folders/1bHQ3Cm5NYfPvOb-EGZXeE6YcODsiLqth?usp=sharing
+unzip ~/Downloads/Muse_Data-*.zip -d data/
+# See data/README.md for the expected layout.
+
+# 3. (Optional) Collect new data — requires a Muse headband
 #    --serial: Muse Bluetooth name (Muse-15C3 or Muse-12A6)
 #    Omit --serial to get an in-app device selection screen
 python src/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
 
-# 3. Train classifiers
+# 4. Train classifiers
 python src/realtime_feedback/train_and_save_models.py
 
-# 4. Run real-time feedback
+# 5. Run real-time feedback
 python src/realtime_feedback/realtime_feedback.py              # with Muse
 python src/realtime_feedback/realtime_feedback.py --simulate   # without hardware
 ```
@@ -99,14 +105,23 @@ src/
 models/
   realtime_models.pkl                  # Trained model bundle for real-time use
 
-data/
-  sub{NN}/                             # Per-subject directories
-    eeg_data_YYYYMMDD_HHMMSS.csv       #   Raw EEG (timestamp + 4 channels)
-    trial_log_YYYYMMDD_HHMMSS.csv      #   Trial metadata
-    metadata.yaml
-  classification_summary.md            # Full results breakdown
-  classification_results*.json         # Raw pipeline outputs
-  blink_detection_results.json
+data/                                  # Downloaded from Google Drive — see data/README.md
+  README.md
+  Muse_Data/
+    Phase1/sub{NN}/                    # Per-subject session
+      eeg_data_YYYYMMDD_HHMMSS.csv     #   Raw EEG (timestamp + 4 channels)
+      trial_log_YYYYMMDD_HHMMSS.csv    #   Trial metadata
+      metadata.yaml
+    Phase2/sub{NN}/                    # Repeat sessions (currently sub03, sub05)
+
+data_analysis/                         # See data_analysis/README.md
+  _common.py                           #   Shared discovery + loading helpers
+  raw/                                 #   Per-subject raw-signal views
+    generate.py                        #     plot_01/02/04
+  signal_level/                        #   PSD + band power, per/cross-subject
+    generate.py                        #     plot_03/06/07/08 + cross_subject_*
+  ml/
+    results.md                         #   Classification results write-up
 ```
 
 ## Data Collection
@@ -129,7 +144,7 @@ Motor imagery epochs are interval-based (cue onset to spacebar press, 2–5s). B
 
 ## Classification Results
 
-4 subjects (sub02–sub05), 77 MI epochs, 190 blink epochs. Full breakdown in [`data/classification_summary.md`](data/classification_summary.md).
+4 subjects (sub02–sub05), 77 MI epochs, 190 blink epochs. Full breakdown in [`data_analysis/ml/results.md`](data_analysis/ml/results.md).
 
 ### Blink Detection
 

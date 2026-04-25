@@ -83,21 +83,28 @@ EEGNET_FIXED_LENGTH = int(5.0 * 256)  # 1280 samples at 256 Hz
 # ============================================================
 
 def find_subject_data(data_dir):
+    """Recursive sub* discovery; supports data/Muse_Data/Phase{1,2}/sub*/."""
     subjects = {}
-    for sub_dir in sorted(data_dir.glob("sub*")):
+    for sub_dir in sorted(data_dir.rglob("sub*")):
+        if not sub_dir.is_dir():
+            continue
         eeg_files = list(sub_dir.glob("eeg_data_*.csv"))
         trial_files = list(sub_dir.glob("trial_log_*.csv"))
-        if eeg_files and trial_files:
-            meta_file = sub_dir / "metadata.yaml"
-            name = sub_dir.name
-            if meta_file.exists():
-                for line in meta_file.read_text().splitlines():
-                    if line.startswith("participant:"):
-                        name = f"{sub_dir.name} ({line.split(':')[1].strip()})"
-            subjects[sub_dir.name] = {
-                "dir": sub_dir, "eeg": eeg_files[0],
-                "trials": trial_files[0], "label": name,
-            }
+        if not (eeg_files and trial_files):
+            continue
+        meta_file = sub_dir / "metadata.yaml"
+        label = sub_dir.name
+        if meta_file.exists():
+            for line in meta_file.read_text().splitlines():
+                if line.startswith("participant:"):
+                    label = f"{sub_dir.name} ({line.split(':')[1].strip()})"
+        key = sub_dir.name
+        if key in subjects:
+            key = f"{sub_dir.parent.name}_{sub_dir.name}"
+        subjects[key] = {
+            "dir": sub_dir, "eeg": eeg_files[0],
+            "trials": trial_files[0], "label": label,
+        }
     return subjects
 
 
