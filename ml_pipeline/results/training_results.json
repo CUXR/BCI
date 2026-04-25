@@ -1,0 +1,305 @@
+{
+  "mi": {
+    "within_subject": {
+      "sub02": {
+        "LDA": 0.25,
+        "SVM_linear": 0.3333,
+        "SVM_rbf": 0.4167,
+        "RF": 0.25,
+        "GBM": 0.3333
+      },
+      "sub03": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      },
+      "sub04": {
+        "LDA": 0.7778,
+        "SVM_linear": 0.7778,
+        "SVM_rbf": 0.6667,
+        "RF": 0.6667,
+        "GBM": 0.7778
+      },
+      "sub05": {
+        "LDA": 0.4545,
+        "SVM_linear": 0.4545,
+        "SVM_rbf": 0.5455,
+        "RF": 0.6364,
+        "GBM": 0.6364
+      },
+      "sub06": {
+        "LDA": null,
+        "SVM_linear": 0.4,
+        "SVM_rbf": 0.4,
+        "RF": 0.4,
+        "GBM": 0.4
+      },
+      "sub07": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      },
+      "sub08": {
+        "LDA": 0.6667,
+        "SVM_linear": 0.5,
+        "SVM_rbf": 0.6667,
+        "RF": 0.6667,
+        "GBM": 0.6667
+      },
+      "sub09": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      },
+      "sub10": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      },
+      "sub11": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      }
+    },
+    "loso": {
+      "sub02": {
+        "LDA": 0.5833,
+        "SVM_linear": 0.5833,
+        "SVM_rbf": 0.5,
+        "RF": 0.5,
+        "GBM": 0.5
+      },
+      "sub03": {
+        "LDA": 0.5,
+        "SVM_linear": 0.5,
+        "SVM_rbf": 0.5,
+        "RF": 0.5,
+        "GBM": 0.5
+      },
+      "sub04": {
+        "LDA": 0.6667,
+        "SVM_linear": 0.6667,
+        "SVM_rbf": 0.6667,
+        "RF": 0.6667,
+        "GBM": 0.5556
+      },
+      "sub05": {
+        "LDA": 0.7273,
+        "SVM_linear": 0.5455,
+        "SVM_rbf": 0.6364,
+        "RF": 0.6364,
+        "GBM": 0.7273
+      },
+      "sub06": {
+        "LDA": 0.8,
+        "SVM_linear": 0.8,
+        "SVM_rbf": 0.6,
+        "RF": 0.6,
+        "GBM": 0.6
+      },
+      "sub07": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      },
+      "sub08": {
+        "LDA": 0.5,
+        "SVM_linear": 0.5,
+        "SVM_rbf": 0.1667,
+        "RF": 0.5,
+        "GBM": 0.5
+      },
+      "sub09": {
+        "LDA": 0.25,
+        "SVM_linear": 0.25,
+        "SVM_rbf": 0.25,
+        "RF": 0.25,
+        "GBM": 0.75
+      },
+      "sub10": {
+        "LDA": null,
+        "SVM_linear": null,
+        "SVM_rbf": null,
+        "RF": null,
+        "GBM": null
+      },
+      "sub11": {
+        "LDA": 0.0,
+        "SVM_linear": 0.3333,
+        "SVM_rbf": 0.0,
+        "RF": 0.0,
+        "GBM": 0.3333
+      }
+    },
+    "ws_means": {
+      "LDA": 0.5372,
+      "SVM_linear": 0.4931,
+      "SVM_rbf": 0.5391,
+      "RF": 0.5239,
+      "GBM": 0.5628
+    },
+    "loso_means": {
+      "LDA": 0.5034,
+      "SVM_linear": 0.5223,
+      "SVM_rbf": 0.415,
+      "RF": 0.4566,
+      "GBM": 0.5583
+    },
+    "n_features": 82,
+    "n_epochs": 54
+  },
+  "blink": {
+    "within_subject": {
+      "sub02": {
+        "LDA": 0.83,
+        "SVM_rbf": 0.86,
+        "RF": 0.82
+      },
+      "sub03": {
+        "LDA": 0.9167,
+        "SVM_rbf": 0.875,
+        "RF": 0.8958
+      },
+      "sub04": {
+        "LDA": 0.92,
+        "SVM_rbf": 0.88,
+        "RF": 0.9
+      },
+      "sub05": {
+        "LDA": 0.9184,
+        "SVM_rbf": 0.9184,
+        "RF": 0.9184
+      },
+      "sub06": {
+        "LDA": 0.8864,
+        "SVM_rbf": 0.8636,
+        "RF": 0.8864
+      },
+      "sub07": {
+        "LDA": 0.7959,
+        "SVM_rbf": 0.7755,
+        "RF": 0.7959
+      },
+      "sub08": {
+        "LDA": 0.92,
+        "SVM_rbf": 0.9,
+        "RF": 0.9
+      },
+      "sub09": {
+        "LDA": 0.98,
+        "SVM_rbf": 0.96,
+        "RF": 1.0
+      },
+      "sub10": {
+        "LDA": null,
+        "SVM_rbf": null,
+        "RF": null
+      },
+      "sub11": {
+        "LDA": 0.9535,
+        "SVM_rbf": 0.9535,
+        "RF": 0.9767
+      },
+      "sub12": {
+        "LDA": 0.82,
+        "SVM_rbf": 0.76,
+        "RF": 0.8
+      }
+    },
+    "loso": {
+      "sub02": {
+        "LDA": 0.79,
+        "SVM_rbf": 0.82,
+        "RF": 0.81
+      },
+      "sub03": {
+        "LDA": 0.7708,
+        "SVM_rbf": 0.7292,
+        "RF": 0.7917
+      },
+      "sub04": {
+        "LDA": 0.92,
+        "SVM_rbf": 0.88,
+        "RF": 0.88
+      },
+      "sub05": {
+        "LDA": 0.7959,
+        "SVM_rbf": 0.7959,
+        "RF": 0.7959
+      },
+      "sub06": {
+        "LDA": 0.7273,
+        "SVM_rbf": 0.8636,
+        "RF": 0.8182
+      },
+      "sub07": {
+        "LDA": 0.7959,
+        "SVM_rbf": 0.7755,
+        "RF": 0.7959
+      },
+      "sub08": {
+        "LDA": 0.8,
+        "SVM_rbf": 0.7,
+        "RF": 0.78
+      },
+      "sub09": {
+        "LDA": 0.92,
+        "SVM_rbf": 0.9,
+        "RF": 0.86
+      },
+      "sub10": {
+        "LDA": null,
+        "SVM_rbf": null,
+        "RF": null
+      },
+      "sub11": {
+        "LDA": 0.907,
+        "SVM_rbf": 0.6744,
+        "RF": 1.0
+      },
+      "sub12": {
+        "LDA": 0.78,
+        "SVM_rbf": 0.48,
+        "RF": 0.66
+      }
+    },
+    "ws_means": {
+      "LDA": 0.8941,
+      "SVM_rbf": 0.8746,
+      "RF": 0.8893
+    },
+    "loso_means": {
+      "LDA": 0.8207,
+      "SVM_rbf": 0.7619,
+      "RF": 0.8192
+    },
+    "n_features": 75,
+    "n_epochs": 565
+  },
+  "subjects": [
+    "sub02",
+    "sub03",
+    "sub04",
+    "sub05",
+    "sub06",
+    "sub07",
+    "sub08",
+    "sub09",
+    "sub10",
+    "sub11",
+    "sub12"
+  ]
+}
