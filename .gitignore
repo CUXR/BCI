@@ -221,5 +221,9 @@ temp/
 TEAM.md
 TODO.md
 .claude/
-data
 src/psychopy_recording/data
+
+# Raw EEG / experiment data — distributed via Google Drive (see data/README.md)
+/data/*
+!/data/README.md
+/data_analysis/sub*/

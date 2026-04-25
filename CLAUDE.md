@@ -69,6 +69,7 @@ EEG column mapping: EEG_0=TP9, EEG_1=AF7, EEG_2=AF8, EEG_3=TP10.
 - TTS uses platform-specific commands (`say` on macOS, `espeak`/`pyttsx3` elsewhere)
 - Experiment protocol details are in `EXPERIMENT_PROCEDURE.md`
 - Data structure spec is in `PROGRAMMING_REQUIREMENTS.md` — treat as authoritative
+- I want you to ALWAYS push using PULL REQUEST.
 
 ## ML Pipeline (In Development)
 

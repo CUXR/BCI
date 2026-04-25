@@ -16,7 +16,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-DATA_DIR = Path(__file__).parent
+DATA_DIR = Path(__file__).parent.parent / "data"
 CH_NAMES = ["TP9", "AF7", "AF8", "TP10"]
 CH_COLS = ["EEG_0", "EEG_1", "EEG_2", "EEG_3"]
 
@@ -39,24 +39,38 @@ MI_TYPES = ["motor_imagery_left", "motor_imagery_right"]
 
 
 def find_subject_data(data_dir):
-    """Discover all subject directories with EEG data."""
+    """Discover all subject directories with EEG data (recursive).
+
+    Walks ``data_dir`` for any ``sub*`` directory containing both an
+    ``eeg_data_*.csv`` and a ``trial_log_*.csv``. The download from Google
+    Drive expands to ``data/Muse_Data/Phase{1,2}/sub*/``, so a recursive
+    search lets the same code work whether the user keeps the nested
+    layout or flattens it. Subject keys include the parent folder when a
+    bare ``subNN`` name would collide (e.g. Phase1/sub05 vs Phase2/sub05).
+    """
     subjects = {}
-    for sub_dir in sorted(data_dir.glob("sub*")):
+    for sub_dir in sorted(data_dir.rglob("sub*")):
+        if not sub_dir.is_dir():
+            continue
         eeg_files = list(sub_dir.glob("eeg_data_*.csv"))
         trial_files = list(sub_dir.glob("trial_log_*.csv"))
-        if eeg_files and trial_files:
-            meta_file = sub_dir / "metadata.yaml"
-            name = sub_dir.name
-            if meta_file.exists():
-                for line in meta_file.read_text().splitlines():
-                    if line.startswith("participant:"):
-                        name = f"{sub_dir.name} ({line.split(':')[1].strip()})"
-            subjects[sub_dir.name] = {
-                "dir": sub_dir,
-                "eeg": eeg_files[0],
-                "trials": trial_files[0],
-                "label": name,
-            }
+        if not (eeg_files and trial_files):
+            continue
+        meta_file = sub_dir / "metadata.yaml"
+        label = sub_dir.name
+        if meta_file.exists():
+            for line in meta_file.read_text().splitlines():
+                if line.startswith("participant:"):
+                    label = f"{sub_dir.name} ({line.split(':')[1].strip()})"
+        key = sub_dir.name
+        if key in subjects:
+            key = f"{sub_dir.parent.name}_{sub_dir.name}"
+        subjects[key] = {
+            "dir": sub_dir,
+            "eeg": eeg_files[0],
+            "trials": trial_files[0],
+            "label": label,
+        }
     return subjects
 
 
