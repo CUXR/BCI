@@ -6,11 +6,14 @@ Raw EEG recordings live on Google Drive — they are deliberately **not committe
 
 [Muse_Data — Google Drive](https://drive.google.com/drive/folders/1bHQ3Cm5NYfPvOb-EGZXeE6YcODsiLqth?usp=sharing)
 
-Use Drive's "Download" button to get a single zip (e.g. `Muse_Data-YYYYMMDD....zip`).
+Use Drive's "Download" button on the top-level `Muse_Data` folder to get
+**one zip containing both phases** (e.g. `Muse_Data-YYYYMMDD....zip`). There
+is no separate Phase 1 / Phase 2 download.
 
 ## Layout
 
-After extracting **into this `data/` folder**, you should have:
+After extracting **into this `data/` folder**, you should have **both
+phases side-by-side**:
 
 ```
 data/
@@ -33,9 +36,12 @@ Each `subNN/` directory contains:
 ## Quick extract
 
 ```bash
-# from repo root
+# from repo root — one zip, populates BOTH Phase1/ and Phase2/
 unzip ~/Downloads/Muse_Data-*.zip -d data/
 ```
+
+After this you will have `data/Muse_Data/Phase1/` **and**
+`data/Muse_Data/Phase2/` populated from the same archive.
 
 The analysis and training scripts walk `data/` recursively, so the nested
 `Muse_Data/Phase{1,2}/sub*/` layout works out of the box — no flattening needed.
