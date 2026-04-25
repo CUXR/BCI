@@ -223,3 +223,7 @@ TODO.md
 .claude/
 data
 src/psychopy_recording/data
+
+# OAuth / API credentials (keep local only)
+ml_pipeline/token.json
+ml_pipeline/client_secret_*.json
