@@ -69,24 +69,37 @@ ARTIFACT_THRESHOLD_UV = 200.0
 # ============================================================
 
 def find_subject_data(data_dir):
-    """Discover all subject directories with EEG data."""
+    """Discover all subject directories with EEG data (recursive).
+
+    Walks ``data_dir`` for any ``sub*`` directory containing both an
+    ``eeg_data_*.csv`` and a ``trial_log_*.csv`` so the Drive layout
+    (``data/Muse_Data/Phase{1,2}/sub*/``) works alongside a flat
+    ``data/sub*/``. Keys disambiguate with the parent folder when a bare
+    ``subNN`` would collide (e.g. Phase1/sub05 vs Phase2/sub05).
+    """
     subjects = {}
-    for sub_dir in sorted(data_dir.glob("sub*")):
+    for sub_dir in sorted(data_dir.rglob("sub*")):
+        if not sub_dir.is_dir():
+            continue
         eeg_files = list(sub_dir.glob("eeg_data_*.csv"))
         trial_files = list(sub_dir.glob("trial_log_*.csv"))
-        if eeg_files and trial_files:
-            meta_file = sub_dir / "metadata.yaml"
-            name = sub_dir.name
-            if meta_file.exists():
-                for line in meta_file.read_text().splitlines():
-                    if line.startswith("participant:"):
-                        name = f"{sub_dir.name} ({line.split(':')[1].strip()})"
-            subjects[sub_dir.name] = {
-                "dir": sub_dir,
-                "eeg": eeg_files[0],
-                "trials": trial_files[0],
-                "label": name,
-            }
+        if not (eeg_files and trial_files):
+            continue
+        meta_file = sub_dir / "metadata.yaml"
+        label = sub_dir.name
+        if meta_file.exists():
+            for line in meta_file.read_text().splitlines():
+                if line.startswith("participant:"):
+                    label = f"{sub_dir.name} ({line.split(':')[1].strip()})"
+        key = sub_dir.name
+        if key in subjects:
+            key = f"{sub_dir.parent.name}_{sub_dir.name}"
+        subjects[key] = {
+            "dir": sub_dir,
+            "eeg": eeg_files[0],
+            "trials": trial_files[0],
+            "label": label,
+        }
     return subjects
 
 
