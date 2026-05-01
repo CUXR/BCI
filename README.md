@@ -34,7 +34,7 @@ unzip ~/Downloads/Muse_Data-*.zip -d data/
 # 3. (Optional) Collect new data — requires a Muse headband
 #    --serial: Muse Bluetooth name (Muse-15C3 or Muse-12A6)
 #    Omit --serial to get an in-app device selection screen
-python src/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
+python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
 
 # 4. Train classifiers
 python src/realtime_feedback/train_and_save_models.py
@@ -92,15 +92,18 @@ src/
     train_and_save_models.py            #   Train & save models for real-time use
     realtime_feedback.py                #   PyQt6 GUI with live classification
   train_blink_detector.py              # Blink detection pipeline
-  eeg_filters.py                       # MNE-based bandpass, notch, artifact removal
-  psychopy_recording/
-    muse_psychopy_recording_structured.py  # Data collection experiment
-  stream_save_muse.py                  # Basic Muse streaming to CSV
-  stream_realtime_bandpower.py         # Live band power computation
-  rebroadcast_producer.py              # Multicast EEG streaming (producer)
-  rebroadcast_consumer.py              # Multicast EEG streaming (consumer)
-  visualize_data_live.py               # Real-time EEG + band power plots
-  muse_eeg_gui.py                      # Legacy PyQt6 GUI (superseded)
+  signal_processing/
+    eeg_filters.py                     # MNE-based bandpass, notch, artifact removal
+  pilot_data_collection/               # Pilot EEG data collection scripts
+    psychopy_recording/
+      muse_psychopy_recording_structured.py  # Data collection experiment
+    stream_save_muse.py                # Basic Muse streaming to CSV
+    rebroadcast_producer.py            # Multicast EEG streaming (producer)
+    rebroadcast_consumer.py            # Multicast EEG streaming (consumer)
+    muse_eeg_gui.py                    # Legacy PyQt6 GUI (superseded)
+  realtime_monitoring/
+    stream_realtime_bandpower.py       # Live band power computation
+    visualize_data_live.py             # Real-time EEG + band power plots
 
 models/
   realtime_models.pkl                  # Trained model bundle for real-time use
