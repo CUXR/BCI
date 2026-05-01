@@ -234,3 +234,23 @@ src/pilot_data_collection/psychopy_recording/data
 # OAuth / API credentials (keep local only)
 ml_pipeline/token.json
 ml_pipeline/client_secret_*.json
+# Unity generated files
+**/Library/
+**/Temp/
+**/Obj/
+**/Build/
+**/Builds/
+**/Logs/
+**/UserSettings/
+
+# Unity/IDE generated files
+**/*.csproj
+**/*.sln
+**/*.user
+**/*.pidb
+**/*.booproj
+**/*.svd
+**/*.pdb
+**/*.mdb
+**/.vs/
+**/.idea/
