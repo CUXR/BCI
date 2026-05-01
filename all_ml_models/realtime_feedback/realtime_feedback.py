@@ -39,7 +39,7 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from eeg_filters import EEGFilter
+from signal_processing.eeg_filters import EEGFilter
 from training.bandpower import train_motor_imagery as mi_mod
 import train_blink_detector as blink_mod
 

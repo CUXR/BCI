@@ -15,15 +15,15 @@ BCI-VR Navigation Control: Decodes left/right motor imagery and intentional blin
 pip install -r requirements.txt
 
 # Run the main experiment (requires Muse headband connected)
-python src/psychopy_recording/muse_psychopy_recording_structured.py --name <name> --number <subject_number>
-# e.g. python src/psychopy_recording/muse_psychopy_recording_structured.py --name alan --number 6
+python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name <name> --number <subject_number>
+# e.g. python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name alan --number 6
 # Creates data/sub06/metadata.yaml automatically
 
 # Run cross-subject analysis
 python data/analyze_all.py
 
 # Basic Muse streaming
-python src/stream_save_muse.py
+python src/pilot_data_collection/stream_save_muse.py
 ```
 
 No test suite or linter is configured.
@@ -32,13 +32,13 @@ No test suite or linter is configured.
 
 Three-layer design:
 
-1. **Hardware/Streaming** (`src/stream_save_muse.py`, `src/stream_realtime_bandpower.py`, `src/rebroadcast_*.py`): BrainFlow interface for Muse 2. Streams EEG to CSV or rebroadcasts for consumers.
+1. **Hardware/Streaming** (`src/pilot_data_collection/stream_save_muse.py`, `src/realtime_monitoring/stream_realtime_bandpower.py`, `src/pilot_data_collection/rebroadcast_*.py`): BrainFlow interface for Muse 2. Streams EEG to CSV or rebroadcasts for consumers.
 
-2. **Experiment/Recording** (`src/psychopy_recording/muse_psychopy_recording_structured.py`): The active experiment implementation. PsychoPy-based visual cue paradigm with threaded background EEG collection. Core class `MusePsychopyRecorder` orchestrates trials via state machine (`ExperimentState` enum). Produces two CSVs per session: raw EEG data + unified trial log.
+2. **Experiment/Recording** (`src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py`): The active experiment implementation. PsychoPy-based visual cue paradigm with threaded background EEG collection. Core class `MusePsychopyRecorder` orchestrates trials via state machine (`ExperimentState` enum). Produces two CSVs per session: raw EEG data + unified trial log.
 
-3. **Analysis** (`data/analyze_all.py`, `src/eeg_filters.py`): Signal processing (MNE-based bandpass/notch filtering, artifact removal) and cross-subject visualization (PSD, band power, epoch averaging, L/R comparison).
+3. **Analysis** (`data/analyze_all.py`, `src/signal_processing/eeg_filters.py`): Signal processing (MNE-based bandpass/notch filtering, artifact removal) and cross-subject visualization (PSD, band power, epoch averaging, L/R comparison).
 
-`src/muse_eeg_gui.py` is a legacy PyQt6 GUI, superseded by PsychoPy.
+`src/pilot_data_collection/muse_eeg_gui.py` is a legacy PyQt6 GUI, superseded by PsychoPy.
 
 ## Critical Data Contracts
 
