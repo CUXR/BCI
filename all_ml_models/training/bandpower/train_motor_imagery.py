@@ -36,7 +36,7 @@ mne.set_log_level("ERROR")
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from eeg_filters import EEGFilter
+from signal_processing.eeg_filters import EEGFilter
 
 # ---------- constants (match analyze_all.py) ----------
 DATA_DIR = PROJECT_ROOT / "data"
