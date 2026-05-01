@@ -3,7 +3,7 @@ import pyqtgraph as pg
 import numpy as np
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds, BrainFlowPresets
 from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations
-from eeg_filters import EEGFilter
+from src.signal_processing.eeg_filters import EEGFilter
 
 # Handle Ctrl+C
 import signal

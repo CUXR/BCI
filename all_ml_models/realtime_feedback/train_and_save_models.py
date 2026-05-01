@@ -28,7 +28,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from training.bandpower import train_motor_imagery as mi_mod
 import train_blink_detector as blink_mod
-from eeg_filters import EEGFilter
+from signal_processing.eeg_filters import EEGFilter
 
 DATA_DIR = PROJECT_ROOT / "data"
 MODELS_DIR = PROJECT_ROOT / "models"
