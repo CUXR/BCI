@@ -1,0 +1,24 @@
+---
+description: Git pushes only when asked; no Cursor in commit messages or history
+alwaysApply: true
+---
+
+# Git and attribution (BCI repo)
+
+## Pushes
+
+- Do **not** run `git push`, `git push --force`, `git push --force-with-lease`, or open PRs via CLI unless the user **explicitly** asks to push or publish in that conversation.
+- It is fine to run read-only git commands (`status`, `log`, `diff`, `fetch` for inspection) when needed for the task.
+
+## Commit messages and history
+
+- Never add **Cursor**, **AI**, or tool branding to Git metadata:
+  - No `Co-authored-by: Cursor …` or `Co-authored-by: …cursor…` lines.
+  - No `Made-with: Cursor` (or similar) footers.
+  - No `@cursor` / `cursoragent` references in commit messages unless the user pastes them.
+- Do not craft commits whose **purpose** is to credit or mention Cursor, the IDE, or the agent.
+- Prefer leaving **commits** to the user unless they clearly ask the agent to commit; if they do ask for a commit, use a neutral message and **only** the author identity already configured in their environment—do not add co-author trailers.
+
+## Scope
+
+- These constraints apply to all work in this repository unless the user overrides for a specific instruction.
