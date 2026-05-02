@@ -1,12 +1,12 @@
 # Data
 
-Raw EEG recordings live on Google Drive — they are deliberately **not committed to this repo** (see `.gitignore`). Download them once and drop them into this folder.
+Raw EEG recordings are **not committed to this repo** (see `.gitignore`). Download the archive once using the link below and extract it into this folder.
 
 ## Download
 
-[Muse_Data — Google Drive](https://drive.google.com/drive/folders/1bHQ3Cm5NYfPvOb-EGZXeE6YcODsiLqth?usp=sharing)
+[Muse_Data — shared folder (browser download)](https://drive.google.com/drive/folders/1bHQ3Cm5NYfPvOb-EGZXeE6YcODsiLqth?usp=sharing)
 
-Use Drive's "Download" button on the top-level `Muse_Data` folder to get
+Use the folder's **Download** action on the top-level `Muse_Data` item to get
 **one zip containing both phases** (e.g. `Muse_Data-YYYYMMDD....zip`). There
 is no separate Phase 1 / Phase 2 download.
 
