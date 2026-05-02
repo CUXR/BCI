@@ -64,6 +64,9 @@ public class AutoMoveDataCollectionController : MonoBehaviour
     [Header("Runtime")]
     [SerializeField] private bool autoStartOnSceneStart = true;
 
+    [Tooltip("Press to toggle the sequence on/off at runtime. Set to None to disable.")]
+    [SerializeField] private KeyCode toggleKey = KeyCode.T;
+
     private static readonly SequenceAction[] Sequence =
     {
         // Outbound path.
@@ -131,6 +134,24 @@ public class AutoMoveDataCollectionController : MonoBehaviour
     private void Update()
     {
         UpdateInstructionTextTransform();
+
+        if (toggleKey != KeyCode.None && Input.GetKeyDown(toggleKey))
+        {
+            ToggleSequence();
+        }
+    }
+
+    [ContextMenu("Toggle Data Collection Sequence")]
+    public void ToggleSequence()
+    {
+        if (activeSequence != null)
+        {
+            StopSequence();
+        }
+        else
+        {
+            StartSequence();
+        }
     }
 
     private void OnDestroy()
