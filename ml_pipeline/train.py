@@ -24,10 +24,8 @@ Usage:
 
 import argparse
 import json
-import pickle
 import sys
 import warnings
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -59,7 +57,6 @@ from dataset_4class import build_dataset_4class                     # type: igno
 
 BASE_4CLASS_BUNDLE_NAME = "realtime_models_4class.pkl"
 BASE_4CLASS_MODEL_VERSION = "base_4class_v1"
-BASE_4CLASS_MODEL_KIND = "base_4class_mi+blink"
 MI_CLASS_NAMES_4CLASS = ["mi_forward", "mi_backward", "mi_rotate_left", "mi_rotate_right"]
 
 
@@ -248,35 +245,25 @@ def train_mi_4class(dataset):
     }
 
 
-def _save_4class_bundle(
-    mi_pipeline, blink_pipeline, *, subjects_list, dataset, out_path,
-):
-    """Pickle the base 4-class bundle. Forward-compatible with the
-    upcoming `ml_models` rewrite of save_model_bundle."""
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    bundle = {
-        "model_version": BASE_4CLASS_MODEL_VERSION,
-        "model_kind": BASE_4CLASS_MODEL_KIND,
-        "class_names": list(MI_CLASS_NAMES_4CLASS),
-        "blink_class_names": ["non_blink", "intentional_blink"],
-        "mi_pipeline": mi_pipeline,
-        "mi_csp_W": None,
-        "mi_ch_indices": [0, 1, 2, 3],
-        "mi_label_map": dict(dataset["mi_label_map"]),
-        "blink_pipeline": blink_pipeline,
-        "blink_ch_indices": [0, 1, 2, 3],
-        "sampling_rate": int(TARGET_SFREQ),
-        "ch_names": list(CH_NAMES),
-        "training_date": datetime.now().isoformat(),
-        "n_subjects": len(subjects_list),
-        "subjects": subjects_list,
-        "n_mi_epochs": len(dataset["mi_epochs"]),
-        "n_blink_pos": len(dataset["blink_pos_epochs"]),
-        "n_blink_neg": len(dataset["blink_neg_epochs"]),
-    }
-    with out_path.open("wb") as f:
-        pickle.dump(bundle, f)
-    return out_path
+def _save_4class_bundle(mi_pipeline, blink_pipeline, *, subjects_list, dataset, out_path):
+    """Save base 4-class bundle through the unified models.save_model_bundle()."""
+    return save_model_bundle(
+        mi_pipeline=mi_pipeline,
+        mi_csp_W=None,
+        blink_pipeline=blink_pipeline,
+        subjects_list=subjects_list,
+        class_names=list(MI_CLASS_NAMES_4CLASS),
+        blink_class_names=["non_blink", "intentional_blink"],
+        model_version=BASE_4CLASS_MODEL_VERSION,
+        model_kind="base_4class",
+        mi_label_map=dict(dataset["mi_label_map"]),
+        output_path=out_path,
+        extra_info={
+            "n_mi_epochs": len(dataset["mi_epochs"]),
+            "n_blink_pos": len(dataset["blink_pos_epochs"]),
+            "n_blink_neg": len(dataset["blink_neg_epochs"]),
+        },
+    )
 
 
 def _parse_args(argv=None):

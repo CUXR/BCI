@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import pickle
 import sys
 import time
 from dataclasses import dataclass
@@ -61,6 +60,7 @@ from preprocessing import (                                         # noqa: E402
     interpolate_nans,
     score_channel_quality_epoch,
 )
+from models import save_model_bundle                                # noqa: E402
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis  # noqa: E402
 from sklearn.ensemble import RandomForestClassifier                 # noqa: E402
 from sklearn.model_selection import StratifiedKFold, cross_val_score  # noqa: E402
@@ -73,7 +73,6 @@ log = logging.getLogger(__name__)
 DEFAULT_DATA_ROOT = _PROJECT_ROOT / "data"
 DEFAULT_OUTPUT_DIR = _ML_DIR / "models" / "participants"
 PERSONALIZED_MODEL_VERSION = "personalized_v1"
-PERSONALIZED_MODEL_KIND = "personalized_4class_mi+blink"
 
 # These channel names are written by pipeline.collector.
 COLLECTOR_CH_COLS = ["TP9", "AF7", "AF8", "TP10"]
@@ -491,40 +490,32 @@ def save_personalized_bundle(
     participant: int,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
 ) -> Path:
-    """Pickle the bundle to ml_pipeline/models/participants/sub<NN>.pkl."""
+    """Save the personalised bundle under ml_pipeline/models/participants/."""
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / f"sub{participant:02d}.pkl"
-
-    bundle = {
-        "model_version": PERSONALIZED_MODEL_VERSION,
-        "model_kind": PERSONALIZED_MODEL_KIND,
-        "class_names": list(ml_config.MI_CLASS_NAMES_4CLASS),
-        "blink_class_names": ["non_blink", L.LABEL_BLINK],
-        "mi_pipeline": fit.mi_pipeline,
-        "mi_csp_W": None,  # 4-class path uses spectral features only
-        "mi_ch_indices": [0, 1, 2, 3],
-        "mi_label_map": dict(ml_config.LABEL_MAP_4CLASS),
-        "blink_pipeline": fit.blink_pipeline,
-        "blink_ch_indices": [0, 1, 2, 3],
-        "sampling_rate": int(ml_config.TARGET_SFREQ),
-        "ch_names": list(COLLECTOR_CH_COLS),
-        "training_date": datetime.now().isoformat(),
-        "n_subjects": 1,
-        "subjects": [],  # intentionally empty — no PII in the bundle
-        "participant_id": int(participant),
-        "n_mi_epochs": fit.n_mi,
-        "n_blink_pos": fit.n_blink_pos,
-        "n_blink_neg": fit.n_blink_neg,
-        "mi_class_counts": dict(fit.mi_class_counts),
-        "cv_score_mi": fit.mi_cv,
-        "cv_score_blink": fit.blink_cv,
-        "train_acc_mi": fit.mi_train_acc,
-        "train_acc_blink": fit.blink_train_acc,
-    }
-    with out_path.open("wb") as f:
-        pickle.dump(bundle, f)
-    return out_path
+    return save_model_bundle(
+        mi_pipeline=fit.mi_pipeline,
+        mi_csp_W=None,
+        blink_pipeline=fit.blink_pipeline,
+        subjects_list=[],  # intentionally empty — no subject IDs / names in bundle
+        class_names=list(ml_config.MI_CLASS_NAMES_4CLASS),
+        blink_class_names=["non_blink", L.LABEL_BLINK],
+        model_version=PERSONALIZED_MODEL_VERSION,
+        model_kind="personalized",
+        mi_label_map=dict(ml_config.LABEL_MAP_4CLASS),
+        participant_id=int(participant),
+        output_path=out_path,
+        extra_info={
+            "n_mi_epochs": fit.n_mi,
+            "n_blink_pos": fit.n_blink_pos,
+            "n_blink_neg": fit.n_blink_neg,
+            "mi_class_counts": dict(fit.mi_class_counts),
+            "cv_score_mi": fit.mi_cv,
+            "cv_score_blink": fit.blink_cv,
+            "train_acc_mi": fit.mi_train_acc,
+            "train_acc_blink": fit.blink_train_acc,
+        },
+    )
 
 
 # ── Public API + CLI ───────────────────────────────────────────────

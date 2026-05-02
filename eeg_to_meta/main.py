@@ -35,7 +35,7 @@ import threading
 from config import (
     SFREQ, STRIDE_S,
     MI_WINDOW_SAMPLES, BLINK_WINDOW_SAMPLES,
-    WS_HOST, WS_PORT,
+    WS_HOST, WS_PORT, PROJECT_ROOT, CLASS_THRESHOLDS,
 )
 from buffer import RingBuffer
 from model_loader import ModelBundle
@@ -62,6 +62,12 @@ def parse_args():
                    help="Muse BLE serial number")
     p.add_argument("--model", type=str, default=None,
                    help="Path to .pkl model bundle")
+    p.add_argument("--participant", type=str, default=None,
+                   help="Participant id used for personalised bundle lookup (e.g. 05)")
+    p.add_argument("--mi-threshold", type=float, default=None,
+                   help="Override confidence threshold for all MI classes")
+    p.add_argument("--blink-threshold", type=float, default=None,
+                   help="Override confidence threshold for intentional blink")
     p.add_argument("--no-ws", action="store_true",
                    help="Disable WebSocket server (terminal only)")
     p.add_argument("--ws-host", type=str, default=WS_HOST,
@@ -72,6 +78,28 @@ def parse_args():
 
 
 async def run_pipeline(args):
+    # ── 0. Resolve model + thresholds ───────────────────────────────
+    if args.model is None and args.participant:
+        pid = str(args.participant).replace("sub", "").strip()
+        if pid.isdigit():
+            participant_model = PROJECT_ROOT / "ml_pipeline" / "models" / "participants" / f"sub{int(pid):02d}.pkl"
+            if participant_model.exists():
+                args.model = str(participant_model)
+                log.info("Using personalised model for sub%s: %s", f"{int(pid):02d}", participant_model)
+
+    if args.model is None:
+        base_4class = PROJECT_ROOT / "ml_pipeline" / "models" / "realtime_models_4class.pkl"
+        if base_4class.exists():
+            args.model = str(base_4class)
+            log.info("Using base 4-class model: %s", base_4class)
+
+    if args.mi_threshold is not None:
+        for k in list(CLASS_THRESHOLDS.keys()):
+            if k.startswith("mi_"):
+                CLASS_THRESHOLDS[k] = float(args.mi_threshold)
+    if args.blink_threshold is not None:
+        CLASS_THRESHOLDS["intentional_blink"] = float(args.blink_threshold)
+
     # ── 1. Load model ──────────────────────────────────────────────
     model = ModelBundle(args.model)
     if not model.load():
@@ -88,6 +116,17 @@ async def run_pipeline(args):
         ws_server = JsonWSServer(host=args.ws_host, port=args.ws_port)
         ws_server.set_loop(asyncio.get_event_loop())
         await ws_server.start()
+        if args.participant:
+            await ws_server.broadcast_state(
+                "personalizing_end",
+                participant=f"sub{str(args.participant).replace('sub', '').zfill(2)}",
+                message="Personalising complete",
+            )
+            await ws_server.broadcast_state(
+                "realtime_ready",
+                participant=f"sub{str(args.participant).replace('sub', '').zfill(2)}",
+                message="Realtime pipeline ready",
+            )
 
     # ── 3. Start EEG stream ────────────────────────────────────────
     if args.mock:
@@ -99,6 +138,7 @@ async def run_pipeline(args):
     log.info("Pipeline running.  Ctrl+C to stop.")
     if ws_server:
         log.info("Unity client → connect to  ws://%s:%d", args.ws_host, args.ws_port)
+        log.info("Active class thresholds: %s", CLASS_THRESHOLDS)
     log.info("Waiting for buffer to fill (%d MI / %d blink samples)...",
              MI_WINDOW_SAMPLES, BLINK_WINDOW_SAMPLES)
 

@@ -18,8 +18,8 @@ from scipy.stats import kurtosis, skew
 from config import (
     SFREQ, MI_BANDS, BANDS, N_CHANNELS,
     FRONTAL_INDICES, TEMPORAL_INDICES,
-    MI_TOTAL_FEATURES, BLINK_TOTAL_FEATURES,
-    BLINK_CONFIDENCE_THRESHOLD, MI_CONFIDENCE_THRESHOLD,
+    BLINK_TOTAL_FEATURES,
+    BLINK_CONFIDENCE_THRESHOLD, MI_CONFIDENCE_THRESHOLD, CLASS_THRESHOLDS,
     BLINK_COOLDOWN_S, MI_COOLDOWN_S,
     CLASS_NAMES,
 )
@@ -229,7 +229,10 @@ class InferenceEngine:
                     result["raw_probs"]["blink"] = blink_prob
                     result["raw_probs"]["non_blink"] = 1.0 - blink_prob
 
-                    if blink_prob >= BLINK_CONFIDENCE_THRESHOLD:
+                    blink_threshold = float(
+                        CLASS_THRESHOLDS.get(CLASS_NAMES["blink"], BLINK_CONFIDENCE_THRESHOLD)
+                    )
+                    if blink_prob >= blink_threshold:
                         self._last_blink_time = now
                         result["label"] = CLASS_NAMES["blink"]
                         result["internal_label"] = "blink"
@@ -246,29 +249,36 @@ class InferenceEngine:
             mi_feat = np.nan_to_num(mi_feat, nan=0.0, posinf=0.0, neginf=0.0)
 
             csp_feat = self.model.apply_csp(mi_clean)
-            full_feat = np.concatenate([mi_feat, csp_feat])
+            if csp_feat.size > 0:
+                full_feat = np.concatenate([mi_feat, csp_feat])
+            else:
+                full_feat = mi_feat
             full_feat = np.nan_to_num(full_feat, nan=0.0, posinf=0.0, neginf=0.0)
 
-            if full_feat.shape[0] != MI_TOTAL_FEATURES:
-                log.warning("MI feature count %d != expected %d", full_feat.shape[0], MI_TOTAL_FEATURES)
+            mi_expected = self.model.mi_expected_features
+            if full_feat.shape[0] != mi_expected:
+                log.warning("MI feature count %d != expected %d", full_feat.shape[0], mi_expected)
             else:
                 try:
                     pred, probas = self.model.predict_mi(full_feat)
-                    left_prob = float(probas[0])
-                    right_prob = float(probas[1]) if len(probas) > 1 else 0.0
-                    result["raw_probs"]["left"] = left_prob
-                    result["raw_probs"]["right"] = right_prob
+                    label_names = self.model.mi_label_names()
+                    for i, p in enumerate(probas):
+                        key = label_names[i] if i < len(label_names) else f"class_{i}"
+                        result["raw_probs"][key] = float(p)
 
-                    confidence = float(probas[pred])
-                    self._last_mi_time = now
+                    confidence = float(probas[pred]) if len(probas) else 0.0
+                    pred_label = (
+                        label_names[pred]
+                        if pred < len(label_names)
+                        else CLASS_NAMES.get("idle", "idle")
+                    )
+                    threshold = float(CLASS_THRESHOLDS.get(pred_label, MI_CONFIDENCE_THRESHOLD))
 
-                    if confidence >= MI_CONFIDENCE_THRESHOLD:
-                        direction = "left" if pred == 0 else "right"
-                        result["label"] = CLASS_NAMES[direction]
-                        result["internal_label"] = direction
-                        result["confidence"] = confidence
-                    else:
-                        result["confidence"] = confidence
+                    if confidence >= threshold:
+                        self._last_mi_time = now
+                        result["label"] = pred_label
+                        result["internal_label"] = pred_label
+                    result["confidence"] = confidence
                 except Exception as exc:
                     log.debug("MI prediction failed: %s", exc)
 
