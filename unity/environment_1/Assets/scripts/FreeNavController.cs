@@ -3,6 +3,10 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class FreeNavController : MonoBehaviour
 {
+    [Header("Mode")]
+    [Tooltip("If a legacy BCICommandClient exists, this controller stands down.")]
+    [SerializeField] private bool disableWhenLegacyBCIClientPresent = true;
+
     [Header("Input")]
     [SerializeField] private PredictionWebSocketClient predictionClient;
 
@@ -60,6 +64,11 @@ public class FreeNavController : MonoBehaviour
 
     private void Update()
     {
+        if (disableWhenLegacyBCIClientPresent && FindObjectOfType<BCI.BCICommandClient>() != null)
+        {
+            return;
+        }
+
         if (latestPrediction == null || rigRoot == null)
         {
             return;
