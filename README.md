@@ -26,8 +26,7 @@ conda activate muse
 pip install -r requirements.txt
 
 # 2. Get the recorded data (NOT committed to this repo)
-#    Download the Muse_Data zip from Google Drive, then unzip into data/:
-#    https://drive.google.com/drive/folders/1bHQ3Cm5NYfPvOb-EGZXeE6YcODsiLqth?usp=sharing
+#    Download the Muse_Data zip from the shared folder in data/README.md, then:
 unzip ~/Downloads/Muse_Data-*.zip -d data/
 # See data/README.md for the expected layout.
 
@@ -108,7 +107,7 @@ src/
 models/
   realtime_models.pkl                  # Trained model bundle for real-time use
 
-data/                                  # Downloaded from Google Drive — see data/README.md
+data/                                  # Downloaded archive — see data/README.md
   README.md
   Muse_Data/
     Phase1/sub{NN}/                    # Per-subject session
