@@ -15,7 +15,12 @@ def main():
     )
     parser.add_argument("--eeg-ip", default="225.1.1.1", help="Multicast IP to consume (default: 225.1.1.1)")
     parser.add_argument("--eeg-port", type=int, default=6677, help="Multicast port (default: 6677)")
-    parser.add_argument("--tcp-port", type=int, default=5000, help="TCP server port (default: 5000)")
+    parser.add_argument("--tcp-port", type=int, default=5050, help="TCP server port (default: 5050; 5000 is used by macOS AirPlay)")
+    parser.add_argument(
+        "--tcp-bind",
+        default="127.0.0.1",
+        help="TCP listen address (default: 127.0.0.1 — not LAN-visible; use 0.0.0.0 for remote clients)",
+    )
     parser.add_argument("--window-sec", type=float, default=1.0, help="Classification window in seconds (default: 1.0)")
     args = parser.parse_args()
 
@@ -38,7 +43,7 @@ def main():
 
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_sock.bind(("0.0.0.0", args.tcp_port))
+    server_sock.bind((args.tcp_bind, args.tcp_port))
     server_sock.listen(5)
 
     def accept_clients():
@@ -52,7 +57,15 @@ def main():
     accept_thread.start()
 
     print(f"Consuming EEG from {args.eeg_ip}:{args.eeg_port}")
-    print(f"TCP server on port {args.tcp_port}")
+    if not args.eeg_ip.startswith("127.") and args.eeg_ip != "localhost":
+        print(
+            "  NOTE: Multicast EEG can be received by other hosts on the same network segment."
+        )
+    print(f"TCP server on {args.tcp_bind}:{args.tcp_port}")
+    if args.tcp_bind == "0.0.0.0":
+        print(
+            "  WARNING: TCP bind is 0.0.0.0 — classification output is exposed on all interfaces (no auth)."
+        )
     print(f"Window: {args.window_sec}s ({window_samples} samples @ {sampling_rate} Hz)")
     print("Press Ctrl+C to stop.\n")
 
