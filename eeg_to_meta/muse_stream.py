@@ -1,0 +1,178 @@
+"""Abstraction layer for live Muse EEG input.
+
+Provides two interchangeable backends:
+    MuseBrainFlowStream  — real Muse 2 via BrainFlow BLE
+    MockMuseStream       — synthetic sinusoidal EEG for offline testing
+
+Both expose the same interface so the rest of the pipeline does not
+need to know which one is active.
+"""
+
+import time
+import logging
+import threading
+
+import numpy as np
+
+from config import (
+    N_CHANNELS, SFREQ,
+    MUSE_2_BOARD_ID, SYNTHETIC_BOARD_ID,
+)
+from buffer import RingBuffer
+
+log = logging.getLogger(__name__)
+
+
+class BaseStream:
+    """Common interface for EEG stream sources."""
+
+    def start(self, buf: RingBuffer):
+        raise NotImplementedError
+
+    def stop(self):
+        raise NotImplementedError
+
+    @property
+    def is_running(self) -> bool:
+        raise NotImplementedError
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Real Muse 2 via BrainFlow
+# ═══════════════════════════════════════════════════════════════════
+
+class MuseBrainFlowStream(BaseStream):
+    """Connects to a Muse 2 headband using BrainFlow's BLE backend.
+
+    Pushes incoming samples into the shared RingBuffer on a background
+    polling thread.
+    """
+
+    def __init__(self, serial: str | None = None, simulate: bool = False):
+        self._serial = serial
+        self._simulate = simulate
+        self._board = None
+        self._thread: threading.Thread | None = None
+        self._running = False
+        self._eeg_channels: list[int] = []
+        self._sr: int = SFREQ
+
+    def start(self, buf: RingBuffer):
+        from brainflow.board_shim import BoardShim, BrainFlowInputParams, BrainFlowPresets
+
+        params = BrainFlowInputParams()
+        if self._serial:
+            params.serial_number = self._serial
+
+        board_id = SYNTHETIC_BOARD_ID if self._simulate else MUSE_2_BOARD_ID
+        label = "SYNTHETIC" if self._simulate else "Muse 2"
+
+        self._board = BoardShim(board_id, params)
+        self._board.prepare_session()
+        self._board.start_stream()
+
+        self._sr = BoardShim.get_sampling_rate(board_id)
+        self._eeg_channels = BoardShim.get_eeg_channels(board_id)
+        log.info("%s stream started: %d EEG channels @ %d Hz",
+                 label, len(self._eeg_channels), self._sr)
+
+        self._running = True
+        self._thread = threading.Thread(
+            target=self._poll_loop, args=(buf,), daemon=True)
+        self._thread.start()
+
+    def _poll_loop(self, buf: RingBuffer):
+        """Pull new samples from BrainFlow and push into the ring buffer."""
+        from brainflow.board_shim import BrainFlowPresets
+
+        while self._running:
+            data = self._board.get_board_data(
+                num_samples=0, preset=BrainFlowPresets.DEFAULT_PRESET)
+            n_new = data.shape[1]
+            if n_new > 0:
+                eeg = np.zeros((N_CHANNELS, n_new), dtype=np.float64)
+                for i, ch_idx in enumerate(self._eeg_channels[:N_CHANNELS]):
+                    eeg[i] = data[ch_idx]
+                buf.push(eeg)
+            time.sleep(0.02)   # 50 Hz poll → ~5 samples per batch @ 256 Hz
+
+    def stop(self):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=2.0)
+        if self._board:
+            try:
+                self._board.stop_stream()
+                self._board.release_session()
+            except Exception:
+                pass
+        log.info("BrainFlow stream stopped")
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Mock stream for offline testing
+# ═══════════════════════════════════════════════════════════════════
+
+class MockMuseStream(BaseStream):
+    """Generates synthetic EEG on a background thread.
+
+    Produces alpha-band (10 Hz) + noise on all 4 channels at 256 Hz.
+    Periodically injects a large amplitude "blink" artefact on the
+    frontal channels to test the blink detector.
+    """
+
+    def __init__(self, sfreq: int = SFREQ, inject_blinks: bool = True):
+        self._sfreq = sfreq
+        self._inject_blinks = inject_blinks
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def start(self, buf: RingBuffer):
+        self._running = True
+        self._thread = threading.Thread(
+            target=self._generate_loop, args=(buf,), daemon=True)
+        self._thread.start()
+        log.info("Mock EEG stream started (%d Hz)", self._sfreq)
+
+    def _generate_loop(self, buf: RingBuffer):
+        rng = np.random.default_rng(42)
+        t = 0.0
+        dt = 1.0 / self._sfreq
+        batch = 8                  # push 8 samples at a time
+        blink_interval = 5.0       # inject blink every 5 s
+        next_blink = blink_interval
+
+        while self._running:
+            samples = np.zeros((N_CHANNELS, batch), dtype=np.float64)
+            for i in range(batch):
+                alpha = 20.0 * np.sin(2 * np.pi * 10.0 * t)  # 10 Hz alpha
+                noise = rng.normal(0, 5, size=N_CHANNELS)
+                samples[:, i] = alpha + noise
+
+                # Inject blink artefact on frontal channels
+                if self._inject_blinks and t >= next_blink and t < next_blink + 0.15:
+                    blink_amp = 300.0 * np.sin(2 * np.pi * 3.0 * (t - next_blink) / 0.15)
+                    samples[1, i] += blink_amp   # AF7
+                    samples[2, i] += blink_amp   # AF8
+
+                if t >= next_blink + 0.15:
+                    next_blink += blink_interval
+
+                t += dt
+
+            buf.push(samples)
+            time.sleep(batch * dt)  # real-time pacing
+
+    def stop(self):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=2.0)
+        log.info("Mock stream stopped")
+
+    @property
+    def is_running(self) -> bool:
+        return self._running

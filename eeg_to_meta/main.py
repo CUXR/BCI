@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""End-to-end Muse EEG → Meta Quest inference pipeline.
+
+    ┌─────────┐   push    ┌────────┐  window  ┌───────────┐
+    │  Muse   │ ────────► │ Ring   │ ───────► │ Inference │
+    │ Stream  │  samples  │ Buffer │          │  Engine   │
+    └─────────┘           └────────┘          └─────┬─────┘
+                                                    │
+                                              prediction
+                                                    │
+                                              ┌─────▼──────┐
+                                              │  Smoother  │
+                                              └─────┬──────┘
+                                                    │
+                                              ┌─────▼──────┐   JSON
+                                              │ WebSocket  │ ────────► Unity / Quest
+                                              │  Server    │
+                                              └────────────┘
+
+Usage:
+    python main.py                    # live Muse 2 + WebSocket
+    python main.py --mock             # synthetic EEG for testing
+    python main.py --mock --no-ws     # headless, no WebSocket
+    python main.py --model <path>     # custom model path
+"""
+
+import argparse
+import asyncio
+import logging
+import signal
+import sys
+import time
+import threading
+
+from config import (
+    SFREQ, STRIDE_S,
+    MI_WINDOW_SAMPLES, BLINK_WINDOW_SAMPLES,
+    WS_HOST, WS_PORT,
+)
+from buffer import RingBuffer
+from model_loader import ModelBundle
+from muse_stream import MuseBrainFlowStream, MockMuseStream
+from inference import InferenceEngine
+from smoothing import PredictionSmoother
+from websocket_server import JsonWSServer
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("main")
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Muse EEG → Meta Quest pipeline")
+    p.add_argument("--mock", action="store_true",
+                   help="Use synthetic EEG stream (no Muse needed)")
+    p.add_argument("--simulate", action="store_true",
+                   help="Use BrainFlow synthetic board")
+    p.add_argument("--serial", type=str, default=None,
+                   help="Muse BLE serial number")
+    p.add_argument("--model", type=str, default=None,
+                   help="Path to .pkl model bundle")
+    p.add_argument("--no-ws", action="store_true",
+                   help="Disable WebSocket server (terminal only)")
+    p.add_argument("--ws-host", type=str, default=WS_HOST,
+                   help="WebSocket bind address (default from config: localhost; use 0.0.0.0 for LAN/Quest)")
+    p.add_argument("--ws-port", type=int, default=WS_PORT,
+                   help=f"WebSocket port (default {WS_PORT})")
+    return p.parse_args()
+
+
+async def run_pipeline(args):
+    # ── 1. Load model ──────────────────────────────────────────────
+    model = ModelBundle(args.model)
+    if not model.load():
+        log.error("Cannot start without a valid model. Exiting.")
+        sys.exit(1)
+
+    # ── 2. Build components ────────────────────────────────────────
+    buf = RingBuffer(max_seconds=10.0)
+    engine = InferenceEngine(model)
+    smoother = PredictionSmoother()
+
+    ws_server: JsonWSServer | None = None
+    if not args.no_ws:
+        ws_server = JsonWSServer(host=args.ws_host, port=args.ws_port)
+        ws_server.set_loop(asyncio.get_event_loop())
+        await ws_server.start()
+
+    # ── 3. Start EEG stream ────────────────────────────────────────
+    if args.mock:
+        stream = MockMuseStream()
+    else:
+        stream = MuseBrainFlowStream(serial=args.serial, simulate=args.simulate)
+    stream.start(buf)
+
+    log.info("Pipeline running.  Ctrl+C to stop.")
+    if ws_server:
+        log.info("Unity client → connect to  ws://%s:%d", args.ws_host, args.ws_port)
+    log.info("Waiting for buffer to fill (%d MI / %d blink samples)...",
+             MI_WINDOW_SAMPLES, BLINK_WINDOW_SAMPLES)
+
+    # ── 4. Inference loop ──────────────────────────────────────────
+    tick = 0
+    try:
+        while True:
+            t0 = time.perf_counter()
+
+            blink_win = buf.get_blink_window()
+            mi_win = buf.get_mi_window()
+
+            if blink_win is None and mi_win is None:
+                await asyncio.sleep(STRIDE_S)
+                continue
+
+            raw_pred = engine.classify(mi_win, blink_win)
+            smoothed = smoother.update(raw_pred)
+
+            # broadcast to Unity clients
+            if ws_server:
+                await ws_server.broadcast(smoothed)
+
+            # terminal log (every 10th tick = ~1 Hz)
+            tick += 1
+            if tick % 10 == 0 or smoothed["label"] != "idle":
+                wall = (time.perf_counter() - t0) * 1000
+                stable_tag = "STABLE" if smoothed["stable"] else "      "
+                log.info(
+                    "%s  %-25s  conf=%.2f  infer=%.1fms  ws_clients=%d  %s",
+                    stable_tag,
+                    smoothed["label"],
+                    smoothed["confidence"],
+                    smoothed["latency_ms"],
+                    ws_server.n_clients if ws_server else 0,
+                    f"raw={smoothed['raw_label']}" if smoothed["label"] != smoothed["raw_label"] else "",
+                )
+
+            elapsed = time.perf_counter() - t0
+            sleep_for = max(0, STRIDE_S - elapsed)
+            await asyncio.sleep(sleep_for)
+
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        log.info("Shutting down...")
+    finally:
+        stream.stop()
+        if ws_server:
+            await ws_server.stop()
+        log.info("Done.")
+
+
+def main():
+    args = parse_args()
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    try:
+        asyncio.run(run_pipeline(args))
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()
