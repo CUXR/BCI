@@ -27,6 +27,17 @@ JSON message contract (Unity → Python):
 For blink trials Unity sends `phase` plus `"trial_type": "blink_intentional"`
 in place of `direction`.
 
+Control frames travel on the same socket as markers but go onto the same
+queue as a separate ControlEvent dataclass. Used for run / session
+boundaries:
+
+    {
+      "type": "control",
+      "event": "run_start" | "run_end" | "session_end",
+      "run_index": 0,
+      "ts_unity": 12.345
+    }
+
 Other inbound message types are ignored but logged so we can debug
 integration issues without crashing the collector. The server only
 emits responses for explicit `{"type": "ping"}` health checks.
@@ -58,9 +69,10 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8766
 
 VALID_PHASES = ("cue", "start", "end")
+VALID_CONTROL_EVENTS = ("run_start", "run_end", "session_end")
 
 
-# ── Marker record ───────────────────────────────────────────────────
+# ── Event records ────────────────────────────────────────────────────
 
 
 @dataclass
@@ -78,6 +90,7 @@ class MarkerEvent:
 
     def to_dict(self) -> dict:
         return {
+            "kind": "marker",
             "phase": self.phase,
             "trial_type": self.trial_type,
             "marker_code": self.marker_code,
@@ -86,6 +99,30 @@ class MarkerEvent:
             "ts_unity": self.ts_unity,
             "ts_recv": self.ts_recv,
         }
+
+
+@dataclass
+class ControlEvent:
+    """Run/session boundary message from Unity (no marker code)."""
+
+    event: str                 # "run_start" | "run_end" | "session_end"
+    run_index: int             # which AutoMove run; -1 for session-level
+    ts_unity: float            # Unity-side timestamp
+    ts_recv: float             # server-side wall clock when received
+    raw: dict = field(default_factory=dict, repr=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "kind": "control",
+            "event": self.event,
+            "run_index": self.run_index,
+            "ts_unity": self.ts_unity,
+            "ts_recv": self.ts_recv,
+        }
+
+
+# Anything queued by the marker server.
+Event = MarkerEvent | ControlEvent
 
 
 # ── Server ──────────────────────────────────────────────────────────
@@ -105,13 +142,13 @@ class MarkerServer:
         self,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
-        queue: Optional["asyncio.Queue[MarkerEvent]"] = None,
+        queue: Optional["asyncio.Queue[Event]"] = None,
         on_marker: Optional[MarkerInjector] = None,
         on_marker_async: Optional[AsyncMarkerHook] = None,
     ) -> None:
         self.host = host
         self.port = port
-        self.queue: asyncio.Queue[MarkerEvent] = queue or asyncio.Queue()
+        self.queue: asyncio.Queue[Event] = queue or asyncio.Queue()
         self._on_marker = on_marker
         self._on_marker_async = on_marker_async
         self._clients: set[websockets.WebSocketServerProtocol] = set()
@@ -169,8 +206,15 @@ class MarkerServer:
             except websockets.ConnectionClosed:
                 pass
             return
+
+        if msg_type == "control":
+            ctrl = self._parse_control(payload)
+            if ctrl is not None:
+                await self.queue.put(ctrl)
+            return
+
         if msg_type != "marker":
-            log.debug("Ignoring non-marker message type=%r", msg_type)
+            log.debug("Ignoring unknown message type=%r", msg_type)
             return
 
         event = self._parse_marker(payload)
@@ -233,6 +277,25 @@ class MarkerServer:
             raw=payload,
         )
 
+    def _parse_control(self, payload: dict) -> Optional[ControlEvent]:
+        event = payload.get("event")
+        if event not in VALID_CONTROL_EVENTS:
+            log.warning("Control message has invalid event field: %r", payload)
+            return None
+        try:
+            run_index = int(payload.get("run_index", -1))
+            ts_unity = float(payload.get("ts_unity", 0.0))
+        except (TypeError, ValueError):
+            log.warning("Control message has non-numeric fields: %r", payload)
+            return None
+        return ControlEvent(
+            event=event,
+            run_index=run_index,
+            ts_unity=ts_unity,
+            ts_recv=time.time(),
+            raw=payload,
+        )
+
     # ── introspection ───────────────────────────────────────────────
 
     @property
@@ -254,8 +317,8 @@ def _build_argparser() -> argparse.ArgumentParser:
     return p
 
 
-async def _drain_to_stdout(queue: "asyncio.Queue[MarkerEvent]") -> None:
-    """Print queued markers in real time — useful for connectivity testing."""
+async def _drain_to_stdout(queue: "asyncio.Queue[Event]") -> None:
+    """Print queued events in real time — useful for connectivity testing."""
     while True:
         ev = await queue.get()
         print(json.dumps(ev.to_dict()))
