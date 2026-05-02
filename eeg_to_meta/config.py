@@ -62,7 +62,18 @@ BANDS = {
 
 # ── Inference thresholds ────────────────────────────────────────────
 BLINK_CONFIDENCE_THRESHOLD = 0.60
-MI_CONFIDENCE_THRESHOLD = 0.55
+MI_CONFIDENCE_THRESHOLD = 0.55  # default fallback for any MI class
+
+# Per-class thresholds (4-class MI + blink). Override at runtime via
+# eeg_to_meta/main.py --mi-threshold / --blink-threshold or by setting
+# values directly on this dict from pipeline.cli.
+CLASS_THRESHOLDS: dict[str, float] = {
+    "mi_forward": MI_CONFIDENCE_THRESHOLD,
+    "mi_backward": MI_CONFIDENCE_THRESHOLD,
+    "mi_rotate_left": MI_CONFIDENCE_THRESHOLD,
+    "mi_rotate_right": MI_CONFIDENCE_THRESHOLD,
+    "intentional_blink": BLINK_CONFIDENCE_THRESHOLD,
+}
 
 # ── Smoothing / debounce ───────────────────────────────────────────
 SMOOTHING_WINDOW = 5           # majority-vote over last N predictions
@@ -78,11 +89,34 @@ WS_HOST = "127.0.0.1"
 WS_PORT = 8765
 
 # ── Class labels ───────────────────────────────────────────────────
+# Canonical labels emitted on the prediction WebSocket. The 4-class MI
+# pipeline adds forward / backward / rotate_left / rotate_right while
+# keeping the legacy left / right keys around so the older 2-class
+# realtime path keeps working until the new inference engine lands.
 CLASS_NAMES = {
     "idle": "idle",
     "blink": "intentional_blink",
+    # Legacy 2-class motor imagery (kept for backward compatibility).
     "left": "left_motor_imagery",
     "right": "right_motor_imagery",
+    # 4-class navigation MI (used by the final-realtime pipeline).
+    "forward": "mi_forward",
+    "backward": "mi_backward",
+    "rotate_left": "mi_rotate_left",
+    "rotate_right": "mi_rotate_right",
+}
+
+# Advisory hints sent to Unity (debug bindings only — FreeNavController
+# uses the model output directly and does not require these keys).
+KEY_HINTS = {
+    "left_motor_imagery": "A",
+    "right_motor_imagery": "D",
+    "mi_forward": "W",
+    "mi_backward": "S",
+    "mi_rotate_left": "A",
+    "mi_rotate_right": "D",
+    "intentional_blink": "SPACE",
+    "idle": "—",
 }
 
 # ── BrainFlow board IDs ───────────────────────────────────────────

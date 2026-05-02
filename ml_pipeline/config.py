@@ -32,9 +32,33 @@ TEMPORAL_INDICES = [0, 3]      # TP9, TP10
 TARGET_SFREQ = 256             # resample all data to this
 
 # ── Trial types ───────────────────────────────────────────────────
+# Legacy 2-class L/R hand motor imagery (still used by the old realtime
+# bundle path; new collector writes 4-class trial types instead).
 MI_TYPES = ["motor_imagery_left", "motor_imagery_right"]
 BLINK_TYPE = "blink_intentional"
 LABEL_MAP = {"motor_imagery_left": 0, "motor_imagery_right": 1, "blink_intentional": 2}
+
+# 4-class navigation MI used by the final-realtime pipeline (forward,
+# backward, rotate-left, rotate-right). Trial-type strings and integer
+# label order MUST stay aligned with pipeline.labels.MI_LABEL_TO_INT.
+MI_TYPES_4CLASS = [
+    "motor_imagery_forward",
+    "motor_imagery_backward",
+    "motor_imagery_rotate_left",
+    "motor_imagery_rotate_right",
+]
+LABEL_MAP_4CLASS = {
+    "motor_imagery_forward": 0,
+    "motor_imagery_backward": 1,
+    "motor_imagery_rotate_left": 2,
+    "motor_imagery_rotate_right": 3,
+}
+MI_CLASS_NAMES_4CLASS = [
+    "mi_forward",
+    "mi_backward",
+    "mi_rotate_left",
+    "mi_rotate_right",
+]
 
 # ── Preprocessing — Channel quality (Delorme paper Table 1) ──────
 SPECTRAL_THRESHOLD_DB = 25.0   # log10(µV²)/Hz in 5-55 Hz band
@@ -96,3 +120,13 @@ RT_BLINK_COOLDOWN_S = 1.0
 RT_MI_COOLDOWN_S = 0.3
 RT_BLINK_THRESHOLD = 0.60
 RT_MI_THRESHOLD = 0.55
+
+# Per-class realtime thresholds for the 4-class pipeline. Tweak per
+# direction if one class is consistently noisier than the others.
+RT_PER_CLASS_THRESHOLDS = {
+    "mi_forward": RT_MI_THRESHOLD,
+    "mi_backward": RT_MI_THRESHOLD,
+    "mi_rotate_left": RT_MI_THRESHOLD,
+    "mi_rotate_right": RT_MI_THRESHOLD,
+    "intentional_blink": RT_BLINK_THRESHOLD,
+}
