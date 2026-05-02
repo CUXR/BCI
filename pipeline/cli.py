@@ -151,10 +151,6 @@ def _realtime_argparser() -> argparse.ArgumentParser:
                    help=f"Root of per-participant data (default: {_DEFAULT_DATA_ROOT})")
     p.add_argument("--model", type=Path, default=None,
                    help="Explicit .pkl bundle path (overrides the auto-resolved one)")
-    p.add_argument("--mi-threshold", type=float, default=None,
-                   help="Override per-class MI threshold (applied to all 4 MI classes)")
-    p.add_argument("--blink-threshold", type=float, default=None,
-                   help="Override blink confidence threshold")
     # Forwarded straight to eeg_to_meta/main.py
     p.add_argument("--mock", action="store_true",
                    help="Use synthetic in-process EEG (no Muse needed)")
@@ -185,17 +181,6 @@ def _launch_eeg_to_meta(args: argparse.Namespace, bundle_path: Path) -> int:
         log.error("%s", _missing_dep_msg(exc))
         return 4
 
-    if args.mi_threshold is not None:
-        eeg_config.MI_CONFIDENCE_THRESHOLD = float(args.mi_threshold)
-        for k in list(eeg_config.CLASS_THRESHOLDS):
-            if k.startswith("mi_"):
-                eeg_config.CLASS_THRESHOLDS[k] = float(args.mi_threshold)
-        log.info("Override MI threshold → %.2f", args.mi_threshold)
-    if args.blink_threshold is not None:
-        eeg_config.BLINK_CONFIDENCE_THRESHOLD = float(args.blink_threshold)
-        eeg_config.CLASS_THRESHOLDS["intentional_blink"] = float(args.blink_threshold)
-        log.info("Override blink threshold → %.2f", args.blink_threshold)
-
     eeg_args = argparse.Namespace(
         mock=args.mock,
         simulate=args.simulate,
@@ -204,6 +189,9 @@ def _launch_eeg_to_meta(args: argparse.Namespace, bundle_path: Path) -> int:
         no_ws=args.no_ws,
         ws_host=args.ws_host if args.ws_host is not None else eeg_config.WS_HOST,
         ws_port=args.ws_port if args.ws_port is not None else eeg_config.WS_PORT,
+        mi_threshold=None,
+        blink_threshold=None,
+        participant=args.participant,
     )
 
     log.info(
