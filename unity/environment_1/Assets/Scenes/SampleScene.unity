@@ -4872,6 +4872,7 @@ GameObject:
   - component: {fileID: 376380761}
   - component: {fileID: 376380760}
   - component: {fileID: 376380763}
+  - component: {fileID: 376380764}
   m_Layer: 0
   m_Name: XR Origin
   m_TagString: Untagged
@@ -4940,6 +4941,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startPosition: {x: 0, y: 1.5, z: 0}
   startYRotation: 0
+--- !u!114 &376380764
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 376380759}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40aac97cb9cd4de48e60de7753c7ce9f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  xrRigRoot: {fileID: 376380762}
+  hmdCamera: {fileID: 1552442029}
+  characterController: {fileID: 0}
+  cueDuration: 3
+  movementDuration: 3
+  movementSpeed: 1
+  rotationAngle: 90
+  instructionTextDistanceFromCamera: 2
+  instructionTextSize: 2
+  instructionText: {fileID: 0}
+  autoStartOnSceneStart: 1
 --- !u!1001 &380772824
 PrefabInstance:
   m_ObjectHideFlags: 0
