@@ -4963,7 +4963,7 @@ MonoBehaviour:
   instructionTextDistanceFromCamera: 2
   instructionTextSize: 2
   instructionText: {fileID: 0}
-  autoStartOnSceneStart: 1
+  autoStartOnSceneStart: 0
 --- !u!1001 &380772824
 PrefabInstance:
   m_ObjectHideFlags: 0
