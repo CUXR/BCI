@@ -223,7 +223,7 @@ TODO.md
 .claude/
 src/pilot_data_collection/psychopy_recording/data
 
-# Raw EEG / experiment data — see data/README.md for how to obtain
+# Raw EEG / experiment data — distributed via Google Drive (see data/README.md)
 /data/*
 !/data/README.md
 /data_analysis/sub*/
@@ -231,9 +231,12 @@ src/pilot_data_collection/psychopy_recording/data
 /data_analysis/raw/outputs/
 /data_analysis/signal_level/outputs/
 
-# Never commit local secrets or API keys under ml_pipeline/
+# OAuth / API credentials (keep local only)
+ml_pipeline/token.json
+ml_pipeline/client_secret_*.json
 ml_pipeline/*.pem
 ml_pipeline/.env
+
 # Unity generated files
 **/Library/
 **/Temp/

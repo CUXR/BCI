@@ -4,11 +4,11 @@ Connects to Muse 2 via BrainFlow, processes EEG in real-time, and displays
 brain state predictions (blink detection + motor imagery L/R) in a PyQt6 GUI.
 
 Prerequisites:
-    python src/realtime_feedback/train_and_save_models.py
+    python all_ml_models/realtime_feedback/train_and_save_models.py
 
 Usage:
-    python src/realtime_feedback/realtime_feedback.py              # Live Muse 2
-    python src/realtime_feedback/realtime_feedback.py --simulate   # Synthetic data for testing
+    python all_ml_models/realtime_feedback/realtime_feedback.py              # Live Muse 2
+    python all_ml_models/realtime_feedback/realtime_feedback.py --simulate   # Synthetic data for testing
 """
 
 import sys
@@ -38,12 +38,13 @@ signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "all_ml_models"))
 
 from signal_processing.eeg_filters import EEGFilter
 from training.bandpower import train_motor_imagery as mi_mod
 import train_blink_detector as blink_mod
 
-MODELS_FILE = PROJECT_ROOT / "models" / "realtime_models.pkl"
+MODELS_FILE = PROJECT_ROOT / "all_ml_models" / "models" / "realtime_models.pkl"
 
 CH_NAMES = ["TP9", "AF7", "AF8", "TP10"]
 SAMPLING_RATE = 256
@@ -80,7 +81,7 @@ class RealtimeClassifier:
         """Load trained model bundle from disk."""
         if not self.models_file.exists():
             print(f"ERROR: Model file not found: {self.models_file}")
-            print("Run 'python src/train_and_save_models.py' first!")
+            print("Run 'python all_ml_models/realtime_feedback/train_and_save_models.py' first!")
             return False
 
         with open(self.models_file, "rb") as f:
@@ -629,6 +630,8 @@ def main():
         "--simulate", action="store_true",
         help="Use synthetic board (no Muse headband needed)")
     parser.add_argument(
+        "--serial", help="Muse Bluetooth name, e.g. Muse-15C3")
+    parser.add_argument(
         "--models", type=str, default=str(MODELS_FILE),
         help="Path to trained model bundle (.pkl)")
     args = parser.parse_args()
@@ -637,12 +640,14 @@ def main():
     classifier = RealtimeClassifier(models_file=Path(args.models))
     if not classifier.load_models():
         print("\nTo train models first, run:")
-        print("  python src/train_and_save_models.py")
+        print("  python all_ml_models/realtime_feedback/train_and_save_models.py")
         sys.exit(1)
 
     # Connect board
     BoardShim.enable_dev_board_logger()
     params = BrainFlowInputParams()
+    if args.serial:
+        params.serial_number = args.serial
 
     if args.simulate:
         board_id = BoardIds.SYNTHETIC_BOARD.value

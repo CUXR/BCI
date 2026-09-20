@@ -1,7 +1,6 @@
 # Classification Results Summary
 
-4 subjects (sub02–sub05), 77 motor imagery epochs, 190 blink epochs. Chance level: 50%.
-sub03 excluded from blink detection (0 blink epochs due to poor signal).
+11 subjects (Phase 1, sub02–sub12), 171 motor imagery epochs, 519 blink epochs (incl. negatives). Chance level: 50%. Refreshed 2026-04-25.
 
 ## Evaluation Methods
 
@@ -21,7 +20,7 @@ This answers: *"If a new user puts on the headband with zero calibration, how we
 
 - **Within-Subject** is the realistic scenario with a short calibration session per user.
 - **LOSO** is the harder, zero-calibration scenario.
-- The drop from within-subject to LOSO reflects how much individual variation exists in the signal. A small drop (like blink detection: 88.7% → 86.0%) means the signal is consistent across people. A large drop (like motor imagery: ~61% → ~62% but both near chance) means high person-to-person variability.
+- The drop from within-subject to LOSO reflects how much individual variation exists in the signal.
 
 ---
 
@@ -31,56 +30,70 @@ This answers: *"If a new user puts on the headband with zero calibration, how we
 
 #### Within-Subject CV
 
-| Pipeline | Config | Features | LDA | SVM-lin | SVM-rbf | RF | **Best** |
-|----------|--------|----------|-----|---------|---------|-----|----------|
-| v1 Band Power | temporal_only (TP9, TP10) | 40 | 56.8 | 57.0 | 55.5 | 53.8 | SVM-lin 57.0 |
-| v1 Band Power | all_4ch | 81 | 53.8 | 51.1 | **61.0** | 55.3 | SVM-rbf 61.0 |
-| v1 Band Power | auto (TP9, AF8, TP10) | 58 | 55.9 | 54.6 | 59.7 | 49.9 | SVM-rbf 59.7 |
-| v2 TimeFreq | temporal_only | 84 | 48.6 | 51.1 | 57.2 | **60.1** | RF 60.1 |
-| v2 TimeFreq | all_4ch | 169 | 49.4 | 50.7 | 58.5 | 52.4 | SVM-rbf 58.5 |
-| v2 TimeFreq | auto | 118 | 55.9 | 57.1 | 59.7 | 50.9 | SVM-rbf 59.7 |
-| v3 EEGNet | temporal_only | 724 | 54.3 | 54.3 | 47.2 | 50.3 | LDA/SVM-lin 54.3 |
-| v3 EEGNet | all_4ch | 809 | 51.8 | 51.8 | 51.0 | **60.7** | RF 60.7 |
-| v3 EEGNet | auto | 758 | 50.3 | 51.8 | 48.5 | **60.5** | RF 60.5 |
+| Pipeline | Config | Channels | Features | LDA | SVM-lin | SVM-rbf | RF | **Best** |
+|----------|--------|----------|----------|-----|---------|---------|-----|----------|
+| v1 Band Power | temporal_only | TP9, TP10 | 40 | 56.7 | 55.6 | 51.6 | 49.9 | LDA 56.7 |
+| v1 Band Power | all_4ch | TP9, AF7, AF8, TP10 | 81 | 46.8 | 50.8 | 48.6 | 47.4 | SVM_linear 50.8 |
+| v1 Band Power | auto | TP9, TP10 | 40 | 56.7 | 55.6 | 51.6 | 49.9 | LDA 56.7 |
+| v2 TimeFreq | temporal_only | TP9, TP10 | 84 | 55.7 | 55.1 | 54.1 | 54.8 | LDA 55.7 |
+| v2 TimeFreq | all_4ch | TP9, AF7, AF8, TP10 | 169 | 48.5 | 52.8 | 48.6 | 52.1 | SVM_linear 52.8 |
+| v2 TimeFreq | auto | TP9, TP10 | 84 | 55.7 | 55.1 | 54.1 | 54.8 | LDA 55.7 |
+| v3 EEGNet | temporal_only | TP9, TP10 | 724 | 54.0 | 52.1 | 49.7 | 46.9 | LDA 54.0 |
+| v3 EEGNet | all_4ch | TP9, AF7, AF8, TP10 | 809 | 50.4 | 50.5 | 50.3 | 47.2 | SVM_linear 50.5 |
+| v3 EEGNet | auto | TP9, TP10 | 724 | 54.0 | 52.1 | 49.7 | 46.9 | LDA 54.0 |
 
 #### LOSO (Leave-One-Subject-Out)
 
 | Pipeline | Config | LDA | SVM-lin | SVM-rbf | RF | **Best** |
 |----------|--------|-----|---------|---------|-----|----------|
-| v1 Band Power | temporal_only | 53.7 | 52.2 | 50.5 | 49.3 | LDA 53.7 |
-| v1 Band Power | all_4ch | 49.0 | 54.5 | 52.0 | 53.2 | SVM-lin 54.5 |
-| v1 Band Power | auto | 49.3 | 49.3 | 53.5 | 54.7 | RF 54.7 |
-| v2 TimeFreq | temporal_only | 48.2 | 43.9 | 50.5 | 48.8 | SVM-rbf 50.5 |
-| v2 TimeFreq | all_4ch | 53.5 | 46.8 | 47.8 | **58.7** | RF 58.7 |
-| v2 TimeFreq | auto | 49.5 | 45.5 | 54.9 | **56.2** | RF 56.2 |
-| v3 EEGNet | temporal_only | 52.0 | 45.3 | 53.2 | **62.2** | RF 62.2 |
-| v3 EEGNet | all_4ch | **61.0** | 58.7 | 54.7 | **61.2** | RF 61.2 |
-| v3 EEGNet | auto | 51.2 | 48.5 | 49.3 | **61.0** | RF 61.0 |
+| v1 Band Power | temporal_only | 55.5 | 53.7 | 57.3 | 56.2 | SVM_rbf 57.3 |
+| v1 Band Power | all_4ch | 53.4 | 48.2 | 51.6 | 52.4 | LDA 53.4 |
+| v1 Band Power | auto | 55.5 | 53.7 | 57.3 | 56.2 | SVM_rbf 57.3 |
+| v2 TimeFreq | temporal_only | 46.9 | 52.0 | 54.5 | 55.3 | RF 55.3 |
+| v2 TimeFreq | all_4ch | 52.5 | 51.4 | 54.9 | 56.3 | RF 56.3 |
+| v2 TimeFreq | auto | 46.9 | 52.0 | 54.5 | 55.3 | RF 55.3 |
+| v3 EEGNet | temporal_only | 46.9 | 45.9 | 57.6 | 45.6 | SVM_rbf 57.6 |
+| v3 EEGNet | all_4ch | 46.9 | 46.5 | 52.4 | 59.4 | RF 59.4 |
+| v3 EEGNet | auto | 46.9 | 45.9 | 57.6 | 45.6 | SVM_rbf 57.6 |
 
 ### Best Motor Imagery Results
 
 | Metric | Pipeline | Config | Classifier | Accuracy |
 |--------|----------|--------|------------|----------|
-| Best within-subject | v1 Band Power | all_4ch | SVM-rbf | **61.0%** |
-| Best LOSO | v3 EEGNet | temporal_only | RF | **62.2%** |
+| Best within-subject | v1 | temporal_only | LDA | **56.7%** |
+| Best LOSO | v3 | all_4ch | RF | **59.4%** |
 
 ### Per-Subject Within-Subject CV (Best Config per Pipeline)
 
-| Subject | v1 (all_4ch, SVM-rbf) | v2 (temporal_only, RF) | v3 (all_4ch, RF) |
-|---------|------------------------|------------------------|-------------------|
-| sub02 | 60.0 | 65.0 | 65.0 |
-| sub03 | 60.0 | 65.0 | 55.0 |
-| sub04 | 58.8 | 35.3 | 52.9 |
-| sub05 | 65.0 | 75.0 | 70.0 |
+| Subject | v1 (temporal_only, LDA) | v2 (temporal_only, LDA) | v3 (temporal_only, LDA) |
+|---|---|---|---|
+| sub02 | 45.0 | 55.0 | 50.0 |
+| sub03 | 33.3 | 44.4 | 66.7 |
+| sub04 | 47.1 | 35.3 | 41.2 |
+| sub05 | 80.0 | 80.0 | 65.0 |
+| sub06 | 57.9 | 63.2 | 52.6 |
+| sub07 | 63.6 | 54.5 | 54.5 |
+| sub08 | 72.2 | 66.7 | 44.4 |
+| sub09 | 42.9 | 42.9 | 57.1 |
+| sub10 | 50.0 | 25.0 | 43.8 |
+| sub11 | — | — | — |
+| sub12 | 75.0 | 90.0 | 65.0 |
 
 ### Per-Subject LOSO (Best Config per Pipeline)
 
-| Subject | v1 (auto, RF) | v2 (all_4ch, RF) | v3 (all_4ch, RF) |
-|---------|---------------|-------------------|-------------------|
-| sub02 | 55.0 | 70.0 | 60.0 |
-| sub03 | 45.0 | 50.0 | 65.0 |
-| sub04 | 58.8 | 64.7 | 64.7 |
-| sub05 | 60.0 | 50.0 | 55.0 |
+| Subject | v1 (temporal_only, SVM_rbf) | v2 (all_4ch, RF) | v3 (all_4ch, RF) |
+|---|---|---|---|
+| sub02 | 60.0 | 50.0 | 70.0 |
+| sub03 | 55.6 | 55.6 | 50.0 |
+| sub04 | 58.8 | 64.7 | 58.8 |
+| sub05 | 75.0 | 45.0 | 45.0 |
+| sub06 | 57.9 | 52.6 | 47.4 |
+| sub07 | 36.4 | 36.4 | 72.7 |
+| sub08 | 77.8 | 61.1 | 55.6 |
+| sub09 | 42.9 | 57.1 | 42.9 |
+| sub10 | 56.2 | 56.2 | 56.2 |
+| sub11 | 60.0 | 80.0 | 100.0 |
+| sub12 | 50.0 | 60.0 | 55.0 |
 
 ---
 
@@ -92,31 +105,38 @@ This answers: *"If a new user puts on the headband with zero calibration, how we
 
 | Config | Channels | Features | LDA | SVM-lin | SVM-rbf | RF | Threshold | **Best** |
 |--------|----------|----------|-----|---------|---------|-----|-----------|----------|
-| frontal_only | AF7, AF8 | 31 | 79.3 | 72.7 | 82.0 | **83.3** | 80.0 | RF 83.3 |
-| all_4ch | TP9, AF7, AF8, TP10 | 59 | **88.7** | 88.0 | 84.7 | 88.0 | 80.0 | LDA 88.7 |
+| frontal_only | AF7, AF8 | 31 | 86.1 | 84.3 | 87.4 | 86.5 | 81.2 | SVM_rbf 87.4 |
+| all_4ch | TP9, AF7, AF8, TP10 | 59 | 91.3 | 89.6 | 87.6 | 90.2 | 81.8 | LDA 91.3 |
 
 #### LOSO
 
 | Config | LDA | SVM-lin | SVM-rbf | RF | Threshold | **Best** |
 |--------|-----|---------|---------|-----|-----------|----------|
-| frontal_only | 70.0 | 64.7 | 79.3 | 81.3 | **82.0** | Threshold 82.0 |
-| all_4ch | **86.0** | 73.3 | 81.3 | 84.7 | 82.0 | LDA 86.0 |
+| frontal_only | 77.9 | 78.9 | 77.3 | 78.1 | 76.0 | SVM_linear 78.9 |
+| all_4ch | 79.8 | 82.2 | 75.4 | 82.2 | 75.8 | SVM_linear 82.2 |
 
 ### Best Blink Detection Results
 
 | Metric | Config | Classifier | Accuracy |
 |--------|--------|------------|----------|
-| Best within-subject | all_4ch | LDA | **88.7%** |
-| Best LOSO | all_4ch | LDA | **86.0%** |
+| Best within-subject | all_4ch | LDA | **91.3%** |
+| Best LOSO | all_4ch | SVM_linear | **82.2%** |
 
-### Per-Subject Blink Detection (all_4ch)
+### Per-Subject Blink Detection (all_4ch, LDA)
 
 | Subject | Within-Subject LDA | LOSO LDA |
 |---------|--------------------|----------|
-| sub02 | 82.0 | 84.0 |
-| sub03 | — (no blink data) | — |
-| sub04 | 90.0 | 86.0 |
-| sub05 | 94.0 | 88.0 |
+| sub02 | 92.0 | 62.0 |
+| sub03 | 92.0 | 90.0 |
+| sub04 | 88.0 | 92.0 |
+| sub05 | 92.0 | 80.0 |
+| sub06 | 93.2 | 86.4 |
+| sub07 | 83.7 | 75.5 |
+| sub08 | 92.0 | 66.0 |
+| sub09 | 100.0 | 96.0 |
+| sub10 | — | — |
+| sub11 | 97.7 | 100.0 |
+| sub12 | 82.0 | 50.0 |
 
 ---
 
@@ -124,21 +144,15 @@ This answers: *"If a new user puts on the headband with zero calibration, how we
 
 | Subject | TP9 | AF7 | AF8 | TP10 |
 |---------|-----|-----|-----|------|
-| sub02 | 0.78 | 0.66 | **0.46** | 0.78 |
-| sub03 | 0.66 | **0.37** | 0.73 | 0.66 |
-| sub04 | 0.69 | 0.64 | **0.50** | 0.67 |
-| sub05 | 0.76 | **0.47** | **0.49** | 0.69 |
+| sub02 | 0.81 | 0.45 | 0.44 | 0.74 |
+| sub03 | 0.73 | 0.44 | 0.44 | 0.65 |
+| sub04 | 0.69 | 0.64 | 0.50 | 0.67 |
+| sub05 | 0.76 | 0.47 | 0.49 | 0.69 |
+| sub06 | 0.62 | 0.43 | 0.41 | 0.60 |
+| sub07 | 0.72 | 0.33 | 0.35 | 0.72 |
+| sub08 | 0.78 | 0.34 | 0.35 | 0.79 |
+| sub09 | 0.83 | 0.70 | 0.59 | 0.82 |
+| sub10 | 0.79 | 0.66 | 0.43 | 0.68 |
+| sub11 | 0.73 | 0.37 | 0.35 | 0.76 |
+| sub12 | 0.38 | 0.34 | 0.35 | 0.69 |
 
-Temporal channels (TP9, TP10) are consistently better quality. Frontal channels (AF7, AF8) show high artifact rates (>45%) in multiple subjects.
-
----
-
-## Key Takeaways
-
-1. **Blink detection works well** — 88.7% within-subject, 86.0% cross-subject with LDA on all 4 channels. Ready for real-time use.
-2. **Motor imagery is near chance** — best results around 60–62%, only marginally above the 50% baseline. High variance across subjects.
-3. **RF generalizes best for MI** — Random Forest consistently dominates LOSO across all pipelines, suggesting it handles cross-subject variability better.
-4. **EEGNet features help LOSO** — v3 pipeline achieves the best cross-subject MI accuracy (62.2%), despite not improving within-subject scores.
-5. **sub04 is difficult** — consistently lowest MI accuracy across pipelines, possibly due to AF8 artifact rate (45.7%).
-6. **sub05 is the best MI performer** — consistently highest within-subject accuracy, up to 85% with RF in v2.
-7. **More features != better** — v3 (640+ EEGNet features) doesn't clearly outperform v1/v2 for within-subject, suggesting overfitting risk with small sample sizes.

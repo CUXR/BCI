@@ -26,7 +26,8 @@ conda activate muse
 pip install -r requirements.txt
 
 # 2. Get the recorded data (NOT committed to this repo)
-#    Download the Muse_Data zip from the shared folder in data/README.md, then:
+#    Download the Muse_Data zip from Google Drive, then unzip into data/:
+#    https://drive.google.com/drive/folders/1bHQ3Cm5NYfPvOb-EGZXeE6YcODsiLqth?usp=sharing
 unzip ~/Downloads/Muse_Data-*.zip -d data/
 # See data/README.md for the expected layout.
 
@@ -36,11 +37,17 @@ unzip ~/Downloads/Muse_Data-*.zip -d data/
 python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
 
 # 4. Train classifiers
-python src/realtime_feedback/train_and_save_models.py
+python all_ml_models/realtime_feedback/train_and_save_models.py
 
 # 5. Run real-time feedback
-python src/realtime_feedback/realtime_feedback.py              # with Muse
-python src/realtime_feedback/realtime_feedback.py --simulate   # without hardware
+python all_ml_models/realtime_feedback/realtime_feedback.py              # with Muse
+python all_ml_models/realtime_feedback/realtime_feedback.py --serial Muse-15C3  # specific Muse
+python all_ml_models/realtime_feedback/realtime_feedback.py --simulate   # without hardware
+
+# Optional: check the Muse connection by recording 10 seconds to temp/
+python src/pilot_data_collection/stream_save_muse.py
+# Select a specific headband if more than one Muse is nearby:
+python src/pilot_data_collection/stream_save_muse.py --serial Muse-15C3
 ```
 
 ## System Architecture
@@ -79,7 +86,7 @@ python src/realtime_feedback/realtime_feedback.py --simulate   # without hardwar
 ## Project Structure
 
 ```
-src/
+all_ml_models/
   training/                             # Offline ML training pipelines
     bandpower/
       train_motor_imagery.py            #   v1: band power + Hjorth + CSP
@@ -91,6 +98,10 @@ src/
     train_and_save_models.py            #   Train & save models for real-time use
     realtime_feedback.py                #   PyQt6 GUI with live classification
   train_blink_detector.py              # Blink detection pipeline
+  models/
+    realtime_models.pkl                # Trained model bundle for real-time use
+
+src/
   signal_processing/
     eeg_filters.py                     # MNE-based bandpass, notch, artifact removal
   pilot_data_collection/               # Pilot EEG data collection scripts
@@ -104,10 +115,7 @@ src/
     stream_realtime_bandpower.py       # Live band power computation
     visualize_data_live.py             # Real-time EEG + band power plots
 
-models/
-  realtime_models.pkl                  # Trained model bundle for real-time use
-
-data/                                  # Downloaded archive — see data/README.md
+data/                                  # Downloaded from Google Drive — see data/README.md
   README.md
   Muse_Data/
     Phase1/sub{NN}/                    # Per-subject session
@@ -171,7 +179,7 @@ Key findings: Blink detection is deployment-ready. Motor imagery is near chance 
 
 ## Real-Time Feedback System
 
-The real-time GUI (`src/realtime_feedback/realtime_feedback.py`) provides live brain state feedback:
+The real-time GUI (`all_ml_models/realtime_feedback/realtime_feedback.py`) provides live brain state feedback:
 
 - **Blink detection** — 500ms sliding window, LDA classifier, ~1s cooldown
 - **Motor imagery** — 3s sliding window, Random Forest with CSP features
