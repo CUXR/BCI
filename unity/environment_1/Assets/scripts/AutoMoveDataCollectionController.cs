@@ -62,7 +62,8 @@ public class AutoMoveDataCollectionController : MonoBehaviour
     [SerializeField] private TMP_Text instructionText;
 
     [Header("Runtime")]
-    [SerializeField] private bool autoStartOnSceneStart = true;
+    [Tooltip("Run the data collection sequence when the scene starts. Uncheck to use the environment without the protocol.")]
+    [SerializeField] private bool enableDataCollectionProtocol = true;
 
     private static readonly SequenceAction[] Sequence =
     {
@@ -119,13 +120,14 @@ public class AutoMoveDataCollectionController : MonoBehaviour
 
     private void Start()
     {
+        if (!enableDataCollectionProtocol)
+        {
+            return;
+        }
+
         ResolveSceneReferences();
         EnsureInstructionText();
-
-        if (autoStartOnSceneStart)
-        {
-            StartSequence();
-        }
+        StartSequence();
     }
 
     private void Update()
@@ -146,6 +148,11 @@ public class AutoMoveDataCollectionController : MonoBehaviour
     [ContextMenu("Start Data Collection Sequence")]
     public void StartSequence()
     {
+        if (!enableDataCollectionProtocol)
+        {
+            return;
+        }
+
         ResolveSceneReferences();
         EnsureInstructionText();
 
