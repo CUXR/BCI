@@ -20,10 +20,8 @@ EEG-based control system for VR navigation using the Muse 2 headband. Decodes le
 ## Quick Start
 
 ```bash
-# 1. Setup (Python 3.11, conda recommended)
-conda create -n muse python=3.11 -y
-conda activate muse
-pip install -r requirements.txt
+# 1. Setup (Python 3.11; install uv first: https://docs.astral.sh/uv/getting-started/installation/)
+uv sync --python 3.11
 
 # 2. Get the recorded data (NOT committed to this repo)
 #    Download the Muse_Data zip from Google Drive, then unzip into data/:
@@ -34,20 +32,20 @@ unzip ~/Downloads/Muse_Data-*.zip -d data/
 # 3. (Optional) Collect new data — requires a Muse headband
 #    --serial: Muse Bluetooth name (Muse-15C3 or Muse-12A6)
 #    Omit --serial to get an in-app device selection screen
-python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
+uv run python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
 
 # 4. Train classifiers
-python all_ml_models/realtime_feedback/train_and_save_models.py
+uv run python all_ml_models/realtime_feedback/train_and_save_models.py
 
 # 5. Run real-time feedback
-python all_ml_models/realtime_feedback/realtime_feedback.py              # with Muse
-python all_ml_models/realtime_feedback/realtime_feedback.py --serial Muse-15C3  # specific Muse
-python all_ml_models/realtime_feedback/realtime_feedback.py --simulate   # without hardware
+uv run python all_ml_models/realtime_feedback/realtime_feedback.py              # with Muse
+uv run python all_ml_models/realtime_feedback/realtime_feedback.py --serial Muse-15C3  # specific Muse
+uv run python all_ml_models/realtime_feedback/realtime_feedback.py --simulate   # without hardware
 
 # Optional: check the Muse connection by recording 10 seconds to temp/
-python src/pilot_data_collection/stream_save_muse.py
+uv run python src/pilot_data_collection/stream_save_muse.py
 # Select a specific headband if more than one Muse is nearby:
-python src/pilot_data_collection/stream_save_muse.py --serial Muse-15C3
+uv run python src/pilot_data_collection/stream_save_muse.py --serial Muse-15C3
 ```
 
 ## System Architecture
@@ -206,6 +204,8 @@ Applied per-channel, matching both offline training and real-time inference:
 5. Bandpass filter (1–40 Hz, 4th-order Butterworth)
 
 ## Dependencies
+
+Dependencies are declared in `pyproject.toml` and resolved in `uv.lock`. Install them with `uv sync --python 3.11`.
 
 - `brainflow` — EEG acquisition
 - `mne` — Signal filtering
