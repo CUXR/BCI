@@ -39,7 +39,7 @@ def _bandpower(sig, sfreq, fmin, fmax):
         return 0.0
     freqs, psd = welch(sig, fs=sfreq, nperseg=nperseg)
     idx = (freqs >= fmin) & (freqs <= fmax)
-    return float(np.trapz(psd[idx], freqs[idx])) if np.any(idx) else 0.0
+    return float(np.trapezoid(psd[idx], freqs[idx])) if np.any(idx) else 0.0
 
 
 def _relative_bandpower(sig, sfreq, fmin, fmax, total_range=(1, 40)):
@@ -49,10 +49,10 @@ def _relative_bandpower(sig, sfreq, fmin, fmax, total_range=(1, 40)):
     freqs, psd = welch(sig, fs=sfreq, nperseg=nperseg)
     band = (freqs >= fmin) & (freqs <= fmax)
     total = (freqs >= total_range[0]) & (freqs <= total_range[1])
-    total_power = np.trapz(psd[total], freqs[total])
+    total_power = np.trapezoid(psd[total], freqs[total])
     if total_power <= 0:
         return 0.0
-    return float(np.trapz(psd[band], freqs[band]) / total_power)
+    return float(np.trapezoid(psd[band], freqs[band]) / total_power)
 
 
 def _hjorth(sig):
