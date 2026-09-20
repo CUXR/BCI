@@ -55,35 +55,35 @@ namespace BCI.Tests
         public void IsAccepted_above_threshold_with_valid_label_is_true()
         {
             var msg = new BCIMessage { label = "LEFT", confidence = 0.7f };
-            Assert.IsTrue(BCICommandLogic.IsAccepted(msg, 0.6f));
+            Assert.IsTrue(BCICommandLogic.IsAccepted(msg, 0.6f, true));
         }
 
         [Test]
         public void IsAccepted_below_threshold_is_false()
         {
             var msg = new BCIMessage { label = "LEFT", confidence = 0.5f };
-            Assert.IsFalse(BCICommandLogic.IsAccepted(msg, 0.6f));
+            Assert.IsFalse(BCICommandLogic.IsAccepted(msg, 0.6f, true));
         }
 
         [Test]
         public void IsAccepted_exactly_at_threshold_is_true()
         {
             var msg = new BCIMessage { label = "LEFT", confidence = 0.6f };
-            Assert.IsTrue(BCICommandLogic.IsAccepted(msg, 0.6f));
+            Assert.IsTrue(BCICommandLogic.IsAccepted(msg, 0.6f, true));
         }
 
         [Test]
         public void IsAccepted_invalid_label_is_false_even_if_high_confidence()
         {
             var msg = new BCIMessage { label = "UP", confidence = 0.99f };
-            Assert.IsFalse(BCICommandLogic.IsAccepted(msg, 0.6f));
+            Assert.IsFalse(BCICommandLogic.IsAccepted(msg, 0.6f, true));
         }
 
         [Test]
         public void IsAccepted_threshold_zero_accepts_any_valid_label()
         {
             var msg = new BCIMessage { label = "RIGHT", confidence = 0.0f };
-            Assert.IsTrue(BCICommandLogic.IsAccepted(msg, 0.0f));
+            Assert.IsTrue(BCICommandLogic.IsAccepted(msg, 0.0f, true));
         }
 
         [Test]

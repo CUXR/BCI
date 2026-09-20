@@ -7,6 +7,9 @@ Sends one BCI-style message per keypress. Run with:
 
 Then in this server's terminal press w/a/s/d (followed by Enter) to emit
 FORWARD / LEFT / BACKWARD / RIGHT, or q to quit.
+
+Listens on the same host/port as eeg_to_meta's real server (WS_PORT in
+eeg_to_meta/config.py), so BCICommandClient connects without reconfiguration.
 """
 import asyncio
 import json
@@ -62,8 +65,8 @@ async def stdin_loop():
 
 
 async def main():
-    async with websockets.serve(handler, "localhost", 5000):
-        print("WS stub listening on ws://localhost:5000")
+    async with websockets.serve(handler, "127.0.0.1", 8765):
+        print("WS stub listening on ws://127.0.0.1:8765")
         await stdin_loop()
 
 

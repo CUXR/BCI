@@ -63,6 +63,11 @@ public class AutoMoveDataCollectionController : MonoBehaviour
 
     [Header("Runtime")]
     [SerializeField] private bool autoStartOnSceneStart = true;
+    [SerializeField, Min(1)] private int sequenceRuns = 1;
+
+    [Header("Networking")]
+    [Tooltip("Optional marker socket client; when present, emits marker/control JSON to Python collector.")]
+    [SerializeField] private MarkerWebSocketClient markerWebSocketClient;
 
     private static readonly SequenceAction[] Sequence =
     {
@@ -179,33 +184,38 @@ public class AutoMoveDataCollectionController : MonoBehaviour
     private IEnumerator RunSequence()
     {
         OpenLog();
-
-        for (int i = 0; i < Sequence.Length; i++)
+        int runCount = Mathf.Max(1, sequenceRuns);
+        for (int runIndex = 0; runIndex < runCount; runIndex++)
         {
-            int stepIndex = i + 1;
-            SequenceAction action = Sequence[i];
-
-            SetInstructionText(action.CueText);
-            LogPhase(stepIndex, action, "cue_start", action.CueText);
-            yield return new WaitForSeconds(cueDuration);
-            LogPhase(stepIndex, action, "cue_end", action.CueText);
-
-            SetInstructionText(action.MovementText);
-            LogPhase(stepIndex, action, "movement_start", action.MovementText);
-
-            if (action.ActionType == ActionType.Movement)
+            markerWebSocketClient?.EmitControl("run_start", runIndex);
+            for (int i = 0; i < Sequence.Length; i++)
             {
-                yield return MoveForDuration(action);
-            }
-            else
-            {
-                yield return RotateForDuration(action);
-            }
+                int stepIndex = i + 1;
+                SequenceAction action = Sequence[i];
 
-            LogPhase(stepIndex, action, "movement_end", action.MovementText);
+                SetInstructionText(action.CueText);
+                LogPhase(stepIndex, runIndex, action, "cue", action.CueText);
+                yield return new WaitForSeconds(cueDuration);
+
+                SetInstructionText(action.MovementText);
+                LogPhase(stepIndex, runIndex, action, "start", action.MovementText);
+
+                if (action.ActionType == ActionType.Movement)
+                {
+                    yield return MoveForDuration(action);
+                }
+                else
+                {
+                    yield return RotateForDuration(action);
+                }
+
+                LogPhase(stepIndex, runIndex, action, "end", action.MovementText);
+            }
+            markerWebSocketClient?.EmitControl("run_end", runIndex);
         }
 
         SetInstructionText("Data collection sequence complete");
+        markerWebSocketClient?.EmitControl("session_end", Mathf.Max(0, runCount - 1));
         activeSequence = null;
         CloseLog();
     }
@@ -383,17 +393,9 @@ public class AutoMoveDataCollectionController : MonoBehaviour
         Debug.Log("Auto movement session log: " + logFilePath);
     }
 
-    private void LogPhase(int stepIndex, SequenceAction action, string phase, string instruction)
+    private void LogPhase(int stepIndex, int runIndex, SequenceAction action, string phase, string instruction)
     {
-        string marker = string.Format(
-            CultureInfo.InvariantCulture,
-            "step_{0:00}_{1}_{2}_{3}",
-            stepIndex,
-            ToLogValue(action.ActionType),
-            ToLogValue(action.Direction),
-            phase);
-
-        SendEEGMarker(marker);
+        SendEEGMarker(stepIndex - 1, runIndex, action, phase);
 
         if (logWriter == null)
         {
@@ -452,9 +454,9 @@ public class AutoMoveDataCollectionController : MonoBehaviour
             case ActionDirection.Backward:
                 return "backward";
             case ActionDirection.Rightward:
-                return "rightward";
+                return "right_rotate";
             case ActionDirection.Leftward:
-                return "leftward";
+                return "left_rotate";
             default:
                 return value.ToString().ToLowerInvariant();
         }
@@ -470,8 +472,32 @@ public class AutoMoveDataCollectionController : MonoBehaviour
         return "\"" + value.Replace("\"", "\"\"") + "\"";
     }
 
-    private void SendEEGMarker(string marker)
+    private string ToProtocolDirection(ActionDirection value)
     {
-        Debug.Log("[EEG Marker] " + marker);
+        switch (value)
+        {
+            case ActionDirection.Forward:
+                return "forward";
+            case ActionDirection.Backward:
+                return "backward";
+            case ActionDirection.Rightward:
+                return "right_rotate";
+            case ActionDirection.Leftward:
+                return "left_rotate";
+            default:
+                return "forward";
+        }
+    }
+
+    private void SendEEGMarker(int trialIndex, int runIndex, SequenceAction action, string phase)
+    {
+        string direction = ToProtocolDirection(action.Direction);
+        markerWebSocketClient?.EmitMarker(
+            phase: phase,
+            direction: direction,
+            trialIndex: trialIndex,
+            runIndex: runIndex
+        );
+        Debug.Log($"[EEG Marker] run={runIndex} trial={trialIndex} phase={phase} direction={direction}");
     }
 }

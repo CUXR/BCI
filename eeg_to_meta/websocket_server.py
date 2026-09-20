@@ -1,14 +1,25 @@
 """Async WebSocket server that streams predictions to Unity / Meta Quest.
 
-JSON message format sent to every connected client on each inference tick:
+JSON prediction message format sent to every connected client on each inference tick:
 
     {
       "timestamp": 1711234567.89,
-      "predicted_class": "left_motor_imagery",
+      "type": "prediction",
+      "predicted_class": "mi_forward",
       "confidence": 0.73,
       "raw_probs": {"left": 0.73, "right": 0.27},
       "stable": true,
       "key_hint": "LeftArrow"
+    }
+
+State message format (sent on lifecycle transitions):
+
+    {
+      "type": "state",
+      "state": "personalizing_start" | "personalizing_end" | "realtime_ready",
+      "participant": "sub05",
+      "message": "Personalising the ML model",
+      "timestamp": 1711234567.89
     }
 
 Unity client expectations:
@@ -45,9 +56,10 @@ _KEY_HINT_BY_PREDICTED_CLASS: dict[str, str] = {
     CLASS_NAMES["blink"]: "B",
     CLASS_NAMES["left"]: "LeftArrow",
     CLASS_NAMES["right"]: "RightArrow",
-    # Reserved for future MI directions (not emitted by current model):
-    "forward_motor_imagery": "UpArrow",
-    "backward_motor_imagery": "DownArrow",
+    CLASS_NAMES["forward"]: "W",
+    CLASS_NAMES["backward"]: "S",
+    CLASS_NAMES["rotate_left"]: "A",
+    CLASS_NAMES["rotate_right"]: "D",
 }
 
 
@@ -116,6 +128,7 @@ class JsonWSServer:
 
         key_hint = _key_hint_for_prediction(prediction)
         payload = {
+            "type": "prediction",
             "timestamp": time.time(),
             "predicted_class": label,
             "confidence": round(prediction.get("confidence", 0.0), 4),
@@ -133,6 +146,30 @@ class JsonWSServer:
         for ws in self._clients:
             try:
                 await ws.send(message)
+            except websockets.ConnectionClosed:
+                stale.add(ws)
+        self._clients -= stale
+
+    async def broadcast_state(self, state: str, *, participant: str | None = None, message: str | None = None):
+        """Broadcast pipeline state events to all connected clients."""
+        if not self._clients:
+            return
+
+        payload = {
+            "type": "state",
+            "state": state,
+            "timestamp": time.time(),
+        }
+        if participant:
+            payload["participant"] = participant
+        if message:
+            payload["message"] = message
+
+        wire = json.dumps(payload)
+        stale = set()
+        for ws in self._clients:
+            try:
+                await ws.send(wire)
             except websockets.ConnectionClosed:
                 stale.add(ws)
         self._clients -= stale

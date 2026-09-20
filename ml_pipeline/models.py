@@ -28,6 +28,17 @@ from sklearn.calibration import CalibratedClassifierCV
 from config import CV_FOLDS, RANDOM_STATE, MODELS_DIR
 
 
+
+
+# ── Bundle schema/version constants ───────────────────────────────
+DEFAULT_BUNDLE_FILENAME = "realtime_models.pkl"
+BASE_4CLASS_BUNDLE_FILENAME = "realtime_models_4class.pkl"
+PERSONALIZED_BUNDLE_SUBDIR = "participants"
+LEGACY_MODEL_VERSION = "legacy_2class"
+BASE_4CLASS_MODEL_VERSION = "base_4class_v1"
+PERSONALIZED_MODEL_VERSION = "personalized_v1"
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Classifier definitions
 # ═══════════════════════════════════════════════════════════════════
@@ -247,16 +258,63 @@ def train_final_model(X, y, model_type="mi"):
     return ensemble
 
 
-def save_model_bundle(mi_pipeline, mi_csp_W, blink_pipeline,
-                      subjects_list, extra_info=None):
+def _default_output_path(model_kind: str = "legacy_2class", participant_id: int | None = None) -> Path:
+    """Resolve default bundle location by model kind."""
+    if model_kind == "personalized":
+        if participant_id is None:
+            raise ValueError("participant_id is required when model_kind='personalized'")
+        return MODELS_DIR / PERSONALIZED_BUNDLE_SUBDIR / f"sub{participant_id:02d}.pkl"
+    if model_kind == "base_4class":
+        return MODELS_DIR / BASE_4CLASS_BUNDLE_FILENAME
+    return MODELS_DIR / DEFAULT_BUNDLE_FILENAME
+
+
+def bundle_class_names(bundle: dict) -> list[str]:
+    """Return canonical MI class names from any bundle shape."""
+    names = bundle.get("class_names")
+    if isinstance(names, list) and names:
+        return [str(n) for n in names]
+
+    # Legacy 2-class fallback
+    return ["left_motor_imagery", "right_motor_imagery"]
+
+
+def save_model_bundle(
+    mi_pipeline,
+    mi_csp_W,
+    blink_pipeline,
+    subjects_list,
+    *,
+    class_names: list[str] | None = None,
+    blink_class_names: list[str] | None = None,
+    model_version: str | None = None,
+    model_kind: str = "legacy_2class",
+    mi_label_map: dict | None = None,
+    participant_id: int | None = None,
+    output_path: Path | str | None = None,
+    extra_info: dict | None = None,
+):
     """Save all models as a single pickle bundle.
 
-    Returns:
-        path to saved file
+    Backward-compatible defaults preserve the legacy bundle shape.
     """
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = Path(output_path) if output_path else _default_output_path(
+        model_kind=model_kind,
+        participant_id=participant_id,
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if model_version is None:
+        if model_kind == "base_4class":
+            model_version = BASE_4CLASS_MODEL_VERSION
+        elif model_kind == "personalized":
+            model_version = PERSONALIZED_MODEL_VERSION
+        else:
+            model_version = LEGACY_MODEL_VERSION
 
     bundle = {
+        "model_version": model_version,
+        "model_kind": model_kind,
         "mi_pipeline": mi_pipeline,
         "mi_csp_W": mi_csp_W,
         "mi_ch_indices": list(range(4)),
@@ -267,20 +325,31 @@ def save_model_bundle(mi_pipeline, mi_csp_W, blink_pipeline,
         "training_date": datetime.now().isoformat(),
         "n_subjects": len(subjects_list),
         "subjects": subjects_list,
+        "class_names": class_names or ["left_motor_imagery", "right_motor_imagery"],
+        "blink_class_names": blink_class_names or ["non_blink", "intentional_blink"],
     }
 
+    if mi_label_map is not None:
+        bundle["mi_label_map"] = mi_label_map
+    if participant_id is not None:
+        bundle["participant_id"] = int(participant_id)
     if extra_info:
         bundle.update(extra_info)
 
-    out_path = MODELS_DIR / "realtime_models.pkl"
     with open(out_path, "wb") as f:
         pickle.dump(bundle, f)
-
     return out_path
 
 
 def load_model_bundle(path=None):
-    """Load a saved model bundle."""
-    path = path or (MODELS_DIR / "realtime_models.pkl")
+    """Load a saved model bundle with backward-compatible defaults."""
+    path = Path(path) if path else (MODELS_DIR / DEFAULT_BUNDLE_FILENAME)
     with open(path, "rb") as f:
-        return pickle.load(f)
+        bundle = pickle.load(f)
+
+    # Backfill schema for legacy bundles.
+    bundle.setdefault("model_version", LEGACY_MODEL_VERSION)
+    bundle.setdefault("model_kind", "legacy_2class")
+    bundle.setdefault("class_names", ["left_motor_imagery", "right_motor_imagery"])
+    bundle.setdefault("blink_class_names", ["non_blink", "intentional_blink"])
+    return bundle
