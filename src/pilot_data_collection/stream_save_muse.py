@@ -1,10 +1,17 @@
+import argparse
 import time
+from pathlib import Path
 import numpy as np
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds, BrainFlowPresets
 from brainflow.data_filter import DataFilter
 
 # 1) choose your Muse connection
+parser = argparse.ArgumentParser(description="Connect to Muse 2 and record 10 seconds of EEG")
+parser.add_argument("--serial", help="Muse Bluetooth name, e.g. Muse-15C3")
+args = parser.parse_args()
 params = BrainFlowInputParams()
+if args.serial:
+    params.serial_number = args.serial
 
 # Option A: Muse 2 via BLE (macOS/Win/Linux). Optionally set mac address like "xx:xx:xx:xx:xx:xx"
 board_id = BoardIds.MUSE_2_BOARD.value
@@ -18,6 +25,7 @@ board = BoardShim(board_id, params)
 
 # 2) prepare and start streaming
 board.prepare_session()
+Path("temp").mkdir(exist_ok=True)
 
 # Save EEG preset to CSV in real time (w = write, a = append).
 board.add_streamer("file://temp/muse_default.csv:w", BrainFlowPresets.DEFAULT_PRESET)

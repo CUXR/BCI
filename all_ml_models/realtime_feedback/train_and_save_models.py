@@ -5,10 +5,10 @@ Trains on all available subject data and saves a model bundle:
   - Motor imagery: RF on all 4 channels (best cross-subject generalization)
 
 Usage:
-    python src/realtime_feedback/train_and_save_models.py
+    python all_ml_models/realtime_feedback/train_and_save_models.py
 
 Output:
-    models/realtime_models.pkl
+    all_ml_models/models/realtime_models.pkl
 """
 
 import sys
@@ -25,16 +25,29 @@ mne.set_log_level("ERROR")
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "all_ml_models"))
 
 from training.bandpower import train_motor_imagery as mi_mod
 import train_blink_detector as blink_mod
 from signal_processing.eeg_filters import EEGFilter
 
 DATA_DIR = PROJECT_ROOT / "data"
-MODELS_DIR = PROJECT_ROOT / "models"
+MODELS_DIR = PROJECT_ROOT / "all_ml_models" / "models"
 OUTPUT_FILE = MODELS_DIR / "realtime_models.pkl"
 
 CH_INDICES = [0, 1, 2, 3]  # all 4 channels: TP9, AF7, AF8, TP10
+
+
+def find_training_sessions(data_dir):
+    """Find every EEG recording with its matching trial log."""
+    sessions = {}
+    for eeg_file in sorted(data_dir.rglob("eeg_data_*.csv")):
+        trial_file = eeg_file.with_name(eeg_file.name.replace("eeg_data_", "trial_log_", 1))
+        if not trial_file.is_file():
+            continue
+        session_id = f"{eeg_file.parent.parent.name}_{eeg_file.parent.name}_{eeg_file.stem.removeprefix('eeg_data_')}"
+        sessions[session_id] = {"eeg": eeg_file, "trials": trial_file}
+    return sessions
 
 
 def train_blink_model(subject_data, fs):
@@ -162,15 +175,15 @@ def main():
     print("BCI Model Training for Real-Time Feedback")
     print("=" * 60)
 
-    subjects = mi_mod.find_subject_data(DATA_DIR)
-    if not subjects:
-        print("ERROR: No subject data found in", DATA_DIR)
+    sessions = find_training_sessions(DATA_DIR)
+    if not sessions:
+        print("ERROR: No paired EEG/trial sessions found in", DATA_DIR)
         return
 
-    print(f"Found {len(subjects)} subjects: {list(subjects.keys())}")
+    print(f"Found {len(sessions)} recording sessions")
 
     subject_data = {}
-    for sub_id, info in subjects.items():
+    for sub_id, info in sessions.items():
         eeg, trials, fs = mi_mod.load_subject(info)
         subject_data[sub_id] = (eeg, trials, fs, info)
 
@@ -181,6 +194,7 @@ def main():
 
     MODELS_DIR.mkdir(exist_ok=True)
 
+    subject_ids = sorted({info["eeg"].parent.name for info in sessions.values()})
     bundle = {
         "blink_pipeline": blink_model,
         "blink_ch_indices": CH_INDICES,
@@ -190,8 +204,9 @@ def main():
         "sampling_rate": int(fs),
         "ch_names": ["TP9", "AF7", "AF8", "TP10"],
         "training_date": datetime.now().isoformat(),
-        "n_subjects": len(subjects),
-        "subjects": list(subjects.keys()),
+        "n_subjects": len(subject_ids),
+        "subjects": subject_ids,
+        "n_sessions": len(sessions),
     }
 
     with open(OUTPUT_FILE, "wb") as f:
@@ -201,7 +216,7 @@ def main():
     print(f"Model bundle saved to {OUTPUT_FILE}")
     print(f"  Blink model: {'OK' if blink_model else 'FAILED'}")
     print(f"  MI model:    {'OK' if mi_model else 'FAILED'}")
-    print(f"  Subjects:    {list(subjects.keys())}")
+    print(f"  Subjects:    {subject_ids} ({len(sessions)} sessions)")
 
 
 if __name__ == "__main__":
