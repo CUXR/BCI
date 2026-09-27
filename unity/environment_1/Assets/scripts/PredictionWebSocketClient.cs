@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Text;
 using NativeWebSocket;
 using UnityEngine;
@@ -28,7 +29,7 @@ public class PredictionWebSocketClient : MonoBehaviour
         public float confidence;
         public bool stable;
         public string key_hint;
-        public float timestamp;
+        public double timestamp;
     }
 
     [Serializable]
@@ -48,14 +49,19 @@ public class PredictionWebSocketClient : MonoBehaviour
 
     private WebSocket socket;
     private bool isConnected;
+    private bool quitting;
 
     public bool IsConnected => isConnected;
 
-    private async void Start()
+    private IEnumerator Start()
     {
-        if (autoConnectOnStart)
+        while (autoConnectOnStart && !quitting)
         {
-            await Connect();
+            if (!isConnected && socket == null)
+            {
+                _ = Connect();
+            }
+            yield return new WaitForSecondsRealtime(2f);
         }
     }
 
@@ -71,6 +77,7 @@ public class PredictionWebSocketClient : MonoBehaviour
 
     private async void OnDestroy()
     {
+        quitting = true;
         await Close();
     }
 
@@ -82,23 +89,42 @@ public class PredictionWebSocketClient : MonoBehaviour
         }
 
         string url = $"ws://{host}:{port}";
-        socket = new WebSocket(url);
-        socket.OnOpen += () =>
+        WebSocket connection = new WebSocket(url);
+        socket = connection;
+        connection.OnOpen += () =>
         {
             isConnected = true;
             Debug.Log("[PredictionWS] Connected: " + url);
             OnConnected?.Invoke();
         };
-        socket.OnError += e => Debug.LogWarning("[PredictionWS] Error: " + e);
-        socket.OnClose += e =>
+        connection.OnError += e => Debug.LogWarning("[PredictionWS] Error: " + e);
+        connection.OnClose += e =>
         {
+            if (socket != connection)
+            {
+                return;
+            }
             isConnected = false;
+            socket = null;
             Debug.Log("[PredictionWS] Closed");
             OnDisconnected?.Invoke();
         };
-        socket.OnMessage += HandleMessage;
+        connection.OnMessage += HandleMessage;
 
-        await socket.Connect();
+        try
+        {
+            await connection.Connect();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[PredictionWS] Connect failed: " + e.Message);
+            if (socket == connection)
+            {
+                socket = null;
+                isConnected = false;
+                OnDisconnected?.Invoke();
+            }
+        }
     }
 
     public async System.Threading.Tasks.Task Close()
