@@ -162,7 +162,7 @@ def _realtime_argparser() -> argparse.ArgumentParser:
     p.add_argument("--simulate", action="store_true",
                    help="Use BrainFlow's synthetic board")
     p.add_argument("--serial", type=str, default=None,
-                   help="Muse BLE serial number (e.g. Muse-15C3)")
+                   help="Muse BLE device name or short ID (e.g. Muse-15C3 or 15C3)")
     p.add_argument("--no-ws", action="store_true",
                    help="Disable the prediction WebSocket server")
     p.add_argument("--ws-host", type=str, default=None,

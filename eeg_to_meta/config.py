@@ -120,5 +120,5 @@ KEY_HINTS = {
 }
 
 # ── BrainFlow board IDs ───────────────────────────────────────────
-MUSE_2_BOARD_ID = 22           # BoardIds.MUSE_2_BOARD
+MUSE_2_BOARD_ID = 38           # BoardIds.MUSE_2_BOARD
 SYNTHETIC_BOARD_ID = -1        # BoardIds.SYNTHETIC_BOARD

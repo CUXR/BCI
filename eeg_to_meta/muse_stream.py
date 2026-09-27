@@ -49,7 +49,7 @@ class MuseBrainFlowStream(BaseStream):
     """
 
     def __init__(self, serial: str | None = None, simulate: bool = False):
-        self._serial = serial
+        self._serial = f"Muse-{serial}" if serial and not serial.startswith("Muse-") else serial
         self._simulate = simulate
         self._board = None
         self._thread: threading.Thread | None = None
