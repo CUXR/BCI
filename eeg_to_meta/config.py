@@ -68,6 +68,8 @@ MI_CONFIDENCE_THRESHOLD = 0.55  # default fallback for any MI class
 # eeg_to_meta/main.py --mi-threshold / --blink-threshold or by setting
 # values directly on this dict from pipeline.cli.
 CLASS_THRESHOLDS: dict[str, float] = {
+    "left_motor_imagery": MI_CONFIDENCE_THRESHOLD,
+    "right_motor_imagery": MI_CONFIDENCE_THRESHOLD,
     "mi_forward": MI_CONFIDENCE_THRESHOLD,
     "mi_backward": MI_CONFIDENCE_THRESHOLD,
     "mi_rotate_left": MI_CONFIDENCE_THRESHOLD,
@@ -78,7 +80,6 @@ CLASS_THRESHOLDS: dict[str, float] = {
 # ── Smoothing / debounce ───────────────────────────────────────────
 SMOOTHING_WINDOW = 5           # majority-vote over last N predictions
 BLINK_COOLDOWN_S = 1.0         # suppress repeat blink triggers
-MI_COOLDOWN_S = 0.3            # suppress rapid MI toggles
 STABILITY_MIN_AGREE = 3        # out of SMOOTHING_WINDOW to be "stable"
 
 # ── WebSocket ──────────────────────────────────────────────────────
@@ -120,5 +121,5 @@ KEY_HINTS = {
 }
 
 # ── BrainFlow board IDs ───────────────────────────────────────────
-MUSE_2_BOARD_ID = 22           # BoardIds.MUSE_2_BOARD
+MUSE_2_BOARD_ID = 38           # BoardIds.MUSE_2_BOARD
 SYNTHETIC_BOARD_ID = -1        # BoardIds.SYNTHETIC_BOARD

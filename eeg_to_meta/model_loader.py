@@ -115,7 +115,8 @@ class ModelBundle:
         """
         if self.mi_csp_W is None:
             return np.zeros(0, dtype=np.float64)
-        projected = self.mi_csp_W.T @ epoch_2d     # (n_comp, n_samples)
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            projected = self.mi_csp_W.T @ epoch_2d     # (n_comp, n_samples)
         return np.log(np.var(projected, axis=1) + 1e-12)
 
     def mi_label_names(self) -> list[str]:

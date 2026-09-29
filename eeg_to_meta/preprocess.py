@@ -111,7 +111,8 @@ def preprocess_mi(window: np.ndarray, sfreq: float) -> np.ndarray:
         sig = window[ch].astype(np.float64)
         sig = _interpolate_nans(sig)
         sig = _interpolate_clipped(sig)
-        sig = sp_signal.detrend(sig)
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            sig = sp_signal.detrend(sig)
         if n_samp > int(sfreq * 0.5):
             sig = _notch(sig, sfreq)
             sig = _bandpass(sig, sfreq, MI_BANDPASS[0], MI_BANDPASS[1])
@@ -148,7 +149,8 @@ def preprocess_blink(window: np.ndarray, sfreq: float) -> np.ndarray:
     for ch in range(n_ch):
         sig = window[ch].astype(np.float64)
         sig = _interpolate_nans(sig)
-        sig = sp_signal.detrend(sig)
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            sig = sp_signal.detrend(sig)
         if n_samp > int(sfreq * 0.25):
             try:
                 sig = _bandpass(sig, sfreq, BLINK_BANDPASS[0], BLINK_BANDPASS[1])

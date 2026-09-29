@@ -48,6 +48,60 @@ uv run python src/pilot_data_collection/stream_save_muse.py
 uv run python src/pilot_data_collection/stream_save_muse.py --serial Muse-15C3
 ```
 
+## Run the Unity Navigation System
+
+With the Muse 2 on and the Quest app running `FreeNavScene`, connect the Quest
+over USB and forward its prediction socket:
+
+```bash
+adb reverse tcp:8765 tcp:8765
+```
+
+From the repository root, start live EEG inference with the existing model:
+
+```bash
+uv run python -m pipeline realtime \
+  --model ml_pipeline/models/realtime_models.pkl \
+  --skip-personalize \
+  --serial 15C3 \
+  --mi-threshold 0.70 \
+  --blink-threshold 0.85
+```
+
+### Wireless Quest connection
+
+1. Put the Mac and Quest on a network where the Quest can reach the Mac. Find
+   the Mac's IP with `ipconfig getifaddr en0` (use the active network interface
+   if `en0` is not connected).
+2. In Unity, open `Assets/Scenes/FreeNavScene.unity` and select the XR Origin's
+   `PredictionWebSocketClient`. Set **Host** to the Mac's IP and leave **Port**
+   at `8765`, then build and install the APK on the Quest. Rebuild if the Mac's
+   IP changes.
+3. Run live inference on the Mac with the WebSocket bound to the network:
+
+   ```bash
+   uv run python -m pipeline realtime \
+     --model ml_pipeline/models/realtime_models.pkl \
+     --skip-personalize --serial 15C3 \
+     --mi-threshold 0.70 --blink-threshold 0.85 \
+     --ws-host 0.0.0.0
+   ```
+
+   `0.0.0.0` is the server's bind address, not the address to enter in Unity.
+   Allow inbound Python connections through the Mac firewall if prompted. The
+   prediction socket is unencrypted and unauthenticated, so use a trusted
+   network.
+
+`--serial` accepts either `15C3` or `Muse-15C3`. An explicit `--model` needs no
+`--participant`. The included model is a legacy two-class bundle for left/right
+turns; forward/backward movement needs a compatible four-class model.
+
+`--mi-threshold 0.70` requires at least 70% model confidence before recognizing
+a motor imagery direction. You can adjust it; the default is 0.55. It also
+applies to the included left/right model.
+`--blink-threshold 0.85` requires at least 85% blink probability before
+recognizing an intentional blink; the default is 0.60.
+
 ## System Architecture
 
 ```

@@ -13,7 +13,8 @@ There are two paths:
   The Quest runs the app standalone; you need an `adb reverse` tunnel or the
   Mac's LAN IP for the WebSocket connections.
 
-The pipeline uses **two** sockets — make sure both reach the Mac:
+The pipeline uses two sockets. FreeNavScene needs port `8765`; the AutoMove
+data-collection scene needs port `8766`:
 
 | Direction | URL | Server | Used by scene |
 |---|---|---|---|
@@ -186,11 +187,11 @@ Quest.
    Settings → Network → Firewall — either disable temporarily or add a rule
    for `python`).
 
-5. By default the Python servers bind to `127.0.0.1`, which is unreachable
-   from the LAN. If you hit "connection refused" from the Quest, bind the
-   server to `0.0.0.0` (or your LAN IP) — see the pipeline source
-   (`pipeline/marker_server.py`, `eeg_to_meta/websocket_server.py`) for the
-   `host` argument.
+5. By default the Python prediction server binds to `127.0.0.1`, which is
+   unreachable from the LAN. For FreeNavScene, start it with
+   `--ws-host 0.0.0.0`; keep the Unity Host field set to the Mac's actual IP.
+   See the [indoor Quest guide](../unity/environment_1/README.md) for the
+   complete live and synthetic test commands.
 
 ### Run
 

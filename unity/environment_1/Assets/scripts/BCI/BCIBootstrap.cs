@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace BCI
 {
@@ -9,6 +10,11 @@ namespace BCI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureClient()
         {
+            if (SceneManager.GetActiveScene().name == "FreeNavScene")
+            {
+                return;
+            }
+
             if (Object.FindObjectOfType<BCICommandClient>() != null)
             {
                 return;

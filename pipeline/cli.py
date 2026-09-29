@@ -86,7 +86,16 @@ def _do_train(rest_argv: list[str]) -> int:
 
 
 def _do_realtime(rest_argv: list[str]) -> int:
-    args = _realtime_argparser().parse_args(rest_argv)
+    parser = _realtime_argparser()
+    args = parser.parse_args(rest_argv)
+    if args.participant is None and args.model is None:
+        parser.error("--participant is required unless --model is provided")
+    if args.re_personalize and args.participant is None:
+        parser.error("--re-personalize requires --participant")
+    if args.mi_threshold is not None and not 0.0 <= args.mi_threshold <= 1.0:
+        parser.error("--mi-threshold must be between 0 and 1")
+    if args.blink_threshold is not None and not 0.0 <= args.blink_threshold <= 1.0:
+        parser.error("--blink-threshold must be between 0 and 1")
     _configure_logging(args.verbose)
 
     bundle_path: Path
@@ -141,8 +150,8 @@ def _realtime_argparser() -> argparse.ArgumentParser:
         prog="pipeline realtime",
         description="Personalise (if needed) and stream EEG predictions to Unity.",
     )
-    p.add_argument("--participant", type=int, required=True,
-                   help="Participant number used to locate the personalised bundle")
+    p.add_argument("--participant", type=int, default=None,
+                   help="Participant number used to locate the personalised bundle (required without --model)")
     p.add_argument("--re-personalize", action="store_true",
                    help="Force a fresh personalisation pass before launching realtime")
     p.add_argument("--skip-personalize", action="store_true",
@@ -157,7 +166,11 @@ def _realtime_argparser() -> argparse.ArgumentParser:
     p.add_argument("--simulate", action="store_true",
                    help="Use BrainFlow's synthetic board")
     p.add_argument("--serial", type=str, default=None,
-                   help="Muse BLE serial number (e.g. Muse-15C3)")
+                   help="Muse BLE device name or short ID (e.g. Muse-15C3 or 15C3)")
+    p.add_argument("--mi-threshold", type=float, default=None,
+                   help="Minimum confidence for motor imagery intent (default: 0.55)")
+    p.add_argument("--blink-threshold", type=float, default=None,
+                   help="Minimum confidence for intentional blink (default: 0.60)")
     p.add_argument("--no-ws", action="store_true",
                    help="Disable the prediction WebSocket server")
     p.add_argument("--ws-host", type=str, default=None,
@@ -189,8 +202,8 @@ def _launch_eeg_to_meta(args: argparse.Namespace, bundle_path: Path) -> int:
         no_ws=args.no_ws,
         ws_host=args.ws_host if args.ws_host is not None else eeg_config.WS_HOST,
         ws_port=args.ws_port if args.ws_port is not None else eeg_config.WS_PORT,
-        mi_threshold=None,
-        blink_threshold=None,
+        mi_threshold=args.mi_threshold,
+        blink_threshold=args.blink_threshold,
         participant=args.participant,
     )
 

@@ -95,7 +95,7 @@ async def run_pipeline(args):
 
     if args.mi_threshold is not None:
         for k in list(CLASS_THRESHOLDS.keys()):
-            if k.startswith("mi_"):
+            if k.startswith("mi_") or k.endswith("_motor_imagery"):
                 CLASS_THRESHOLDS[k] = float(args.mi_threshold)
     if args.blink_threshold is not None:
         CLASS_THRESHOLDS["intentional_blink"] = float(args.blink_threshold)
@@ -144,6 +144,7 @@ async def run_pipeline(args):
 
     # ── 4. Inference loop ──────────────────────────────────────────
     tick = 0
+    last_recognized_intent = None
     try:
         while True:
             t0 = time.perf_counter()
@@ -158,13 +159,28 @@ async def run_pipeline(args):
             raw_pred = engine.classify(mi_win, blink_win)
             smoothed = smoother.update(raw_pred)
 
+            recognized_intent = (
+                smoothed["label"]
+                if smoothed["stable"] and smoothed["label"] in
+                ("left_motor_imagery", "right_motor_imagery")
+                else None
+            )
+            if recognized_intent != last_recognized_intent and recognized_intent:
+                direction = "left" if recognized_intent == "left_motor_imagery" else "right"
+                log.info("Recognized %s intent (confidence=%.2f)", direction, smoothed["confidence"])
+            if smoothed["stable"]:
+                last_recognized_intent = recognized_intent
+
             # broadcast to Unity clients
             if ws_server:
                 await ws_server.broadcast(smoothed)
 
-            # terminal log (every 10th tick = ~1 Hz)
+            # Blink: every tick; left/right: ~2 Hz; other status: ~1 Hz.
             tick += 1
-            if tick % 10 == 0 or smoothed["label"] != "idle":
+            label = smoothed["label"]
+            if (label == "intentional_blink" or smoothed["raw_label"] == "intentional_blink" or
+                (label in ("left_motor_imagery", "right_motor_imagery") and tick % 5 == 0) or
+                tick % 10 == 0):
                 wall = (time.perf_counter() - t0) * 1000
                 stable_tag = "STABLE" if smoothed["stable"] else "      "
                 log.info(

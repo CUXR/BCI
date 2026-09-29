@@ -14,6 +14,7 @@ From repo root:
 - `python -m pipeline train --variant 4class`
 - `python -m pipeline personalize --participant 5`
 - `python -m pipeline realtime --participant 5 --mi-threshold 0.58 --blink-threshold 0.62`
+- `uv run python -m pipeline realtime --model ml_pipeline/models/realtime_models.pkl --skip-personalize --serial <your_Muse_serial>` (existing model bundle, no participant)
 
 ## WebSocket Protocols
 
