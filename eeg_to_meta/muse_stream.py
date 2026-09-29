@@ -86,8 +86,7 @@ class MuseBrainFlowStream(BaseStream):
         from brainflow.board_shim import BrainFlowPresets
 
         while self._running:
-            data = self._board.get_board_data(
-                num_samples=0, preset=BrainFlowPresets.DEFAULT_PRESET)
+            data = self._board.get_board_data(preset=BrainFlowPresets.DEFAULT_PRESET)
             n_new = data.shape[1]
             if n_new > 0:
                 eeg = np.zeros((N_CHANNELS, n_new), dtype=np.float64)

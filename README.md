@@ -48,6 +48,30 @@ uv run python src/pilot_data_collection/stream_save_muse.py
 uv run python src/pilot_data_collection/stream_save_muse.py --serial Muse-15C3
 ```
 
+## Run the Unity Navigation System
+
+With the Muse 2 on and the Quest app running `FreeNavScene`, connect the Quest
+over USB and forward its prediction socket:
+
+```bash
+adb reverse tcp:8765 tcp:8765
+```
+
+From the repository root, start live EEG inference with the existing model:
+
+```bash
+uv run python -m pipeline realtime \
+  --model ml_pipeline/models/realtime_models.pkl \
+  --skip-personalize \
+  --serial 15C3
+```
+
+`--serial` accepts either `15C3` or `Muse-15C3`. An explicit `--model` needs no
+`--participant`. The included model is a legacy two-class bundle for left/right
+turns; forward/backward movement needs a compatible four-class model. See the
+[Quest setup guide](unity/environment_1/README.md) for building the app and
+testing its movement mappings.
+
 ## System Architecture
 
 ```
