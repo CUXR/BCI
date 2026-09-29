@@ -12,6 +12,10 @@ disconnected, or stale prediction does not move the rig. Prediction frames must
 include a Unix `timestamp` in seconds; the client rejects old frames queued
 while the headset sleeps.
 
+The Python runtime sends at most one valid navigation prediction every three
+seconds. The scene moves for up to 0.5 seconds after that frame, then stops
+until another accepted command arrives. Blink predictions are not rate-limited.
+
 ## Build and connect
 
 1. In Unity, select Android and build `FreeNavScene` (the enabled scene in Build

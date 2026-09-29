@@ -1,6 +1,6 @@
 """Async WebSocket server that streams predictions to Unity / Meta Quest.
 
-JSON prediction message format sent to every connected client on each inference tick:
+JSON prediction message format sent to connected clients:
 
     {
       "timestamp": 1711234567.89,
@@ -25,7 +25,8 @@ State message format (sent on lifecycle transitions):
 Unity client expectations:
     - Connect to  ws://<backend-ip>:8765
     - Messages are UTF-8 JSON, one per WebSocket frame
-    - Frequency ≈ 10 Hz (every STRIDE_S = 0.1 s)
+    - Valid navigation predictions are sent at most once every 3 seconds
+      across all directions; blink predictions keep the inference cadence.
     - The "stable" flag indicates majority-vote agreement;
       ignore predictions where stable=false if you want cleaner input
     - "predicted_class" uses the canonical names:
@@ -45,9 +46,16 @@ import time
 import websockets
 from websockets.server import serve
 
-from config import WS_HOST, WS_PORT, CLASS_NAMES
+from config import WS_HOST, WS_PORT, CLASS_NAMES, CLASS_THRESHOLDS, MI_CONFIDENCE_THRESHOLD
 
 log = logging.getLogger(__name__)
+
+_NAVIGATION_LABELS = {
+    CLASS_NAMES["left"], CLASS_NAMES["right"],
+    CLASS_NAMES["forward"], CLASS_NAMES["backward"],
+    CLASS_NAMES["rotate_left"], CLASS_NAMES["rotate_right"],
+}
+_NAVIGATION_COOLDOWN_S = 3.0
 
 # Suggested Unity KeyCode strings for each predicted_class label.
 # Extend here if you add new model outputs (e.g. forward/back classes).
@@ -79,6 +87,7 @@ class JsonWSServer:
         self._clients: set[websockets.WebSocketServerProtocol] = set()
         self._server = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._last_navigation_sent_at = float("-inf")
 
     # ── lifecycle ───────────────────────────────────────────────────
 
@@ -126,6 +135,18 @@ class JsonWSServer:
         if label == CLASS_NAMES["idle"]:
             return
 
+        navigation = label in _NAVIGATION_LABELS
+        if navigation:
+            if (not prediction.get("stable", False) or
+                    prediction.get("confidence", 0.0) <
+                    CLASS_THRESHOLDS.get(label, MI_CONFIDENCE_THRESHOLD)):
+                return
+            now = time.monotonic()
+            if now - self._last_navigation_sent_at < _NAVIGATION_COOLDOWN_S:
+                return
+            previous_sent_at = self._last_navigation_sent_at
+            self._last_navigation_sent_at = now
+
         key_hint = _key_hint_for_prediction(prediction)
         payload = {
             "type": "prediction",
@@ -143,12 +164,19 @@ class JsonWSServer:
         message = json.dumps(payload)
 
         stale = set()
+        sent_count = 0
         for ws in self._clients:
             try:
                 await ws.send(message)
+                sent_count += 1
             except websockets.ConnectionClosed:
                 stale.add(ws)
         self._clients -= stale
+        if navigation:
+            if sent_count:
+                log.info("Sent navigation command %s to %d client(s)", label, sent_count)
+            else:
+                self._last_navigation_sent_at = previous_sent_at
 
     async def broadcast_state(self, state: str, *, participant: str | None = None, message: str | None = None):
         """Broadcast pipeline state events to all connected clients."""
