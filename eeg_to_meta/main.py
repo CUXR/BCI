@@ -175,9 +175,12 @@ async def run_pipeline(args):
             if ws_server:
                 await ws_server.broadcast(smoothed)
 
-            # terminal log (every 10th tick = ~1 Hz)
+            # Blink: every tick; left/right: ~2 Hz; other status: ~1 Hz.
             tick += 1
-            if tick % 10 == 0:
+            label = smoothed["label"]
+            if (label == "intentional_blink" or smoothed["raw_label"] == "intentional_blink" or
+                (label in ("left_motor_imagery", "right_motor_imagery") and tick % 5 == 0) or
+                tick % 10 == 0):
                 wall = (time.perf_counter() - t0) * 1000
                 stable_tag = "STABLE" if smoothed["stable"] else "      "
                 log.info(

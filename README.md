@@ -63,7 +63,8 @@ From the repository root, start live EEG inference with the existing model:
 uv run python -m pipeline realtime \
   --model ml_pipeline/models/realtime_models.pkl \
   --skip-personalize \
-  --serial 15C3
+  --serial 15C3 \
+  --mi-threshold 0.70
 ```
 
 `--serial` accepts either `15C3` or `Muse-15C3`. An explicit `--model` needs no
@@ -72,9 +73,9 @@ turns; forward/backward movement needs a compatible four-class model. See the
 [Quest setup guide](unity/environment_1/README.md) for building the app and
 testing its movement mappings.
 
-Add `--mi-threshold 0.70` to the command to require at least 70% model confidence
-before recognizing a motor imagery direction (default: 0.55). This also applies
-to the included left/right model.
+`--mi-threshold 0.70` requires at least 70% model confidence before recognizing
+a motor imagery direction. You can adjust it; the default is 0.55. It also
+applies to the included left/right model.
 
 ## System Architecture
 
