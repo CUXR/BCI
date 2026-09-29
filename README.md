@@ -72,6 +72,10 @@ turns; forward/backward movement needs a compatible four-class model. See the
 [Quest setup guide](unity/environment_1/README.md) for building the app and
 testing its movement mappings.
 
+Add `--mi-threshold 0.70` to the command to require at least 70% model confidence
+before recognizing a motor imagery direction (default: 0.55). This also applies
+to the included left/right model.
+
 ## System Architecture
 
 ```

@@ -68,6 +68,8 @@ MI_CONFIDENCE_THRESHOLD = 0.55  # default fallback for any MI class
 # eeg_to_meta/main.py --mi-threshold / --blink-threshold or by setting
 # values directly on this dict from pipeline.cli.
 CLASS_THRESHOLDS: dict[str, float] = {
+    "left_motor_imagery": MI_CONFIDENCE_THRESHOLD,
+    "right_motor_imagery": MI_CONFIDENCE_THRESHOLD,
     "mi_forward": MI_CONFIDENCE_THRESHOLD,
     "mi_backward": MI_CONFIDENCE_THRESHOLD,
     "mi_rotate_left": MI_CONFIDENCE_THRESHOLD,

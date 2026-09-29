@@ -95,7 +95,7 @@ async def run_pipeline(args):
 
     if args.mi_threshold is not None:
         for k in list(CLASS_THRESHOLDS.keys()):
-            if k.startswith("mi_"):
+            if k.startswith("mi_") or k.endswith("_motor_imagery"):
                 CLASS_THRESHOLDS[k] = float(args.mi_threshold)
     if args.blink_threshold is not None:
         CLASS_THRESHOLDS["intentional_blink"] = float(args.blink_threshold)
@@ -168,7 +168,8 @@ async def run_pipeline(args):
             if recognized_intent != last_recognized_intent and recognized_intent:
                 direction = "left" if recognized_intent == "left_motor_imagery" else "right"
                 log.info("Recognized %s intent (confidence=%.2f)", direction, smoothed["confidence"])
-            last_recognized_intent = recognized_intent
+            if smoothed["stable"]:
+                last_recognized_intent = recognized_intent
 
             # broadcast to Unity clients
             if ws_server:
@@ -176,7 +177,7 @@ async def run_pipeline(args):
 
             # terminal log (every 10th tick = ~1 Hz)
             tick += 1
-            if tick % 10 == 0 or smoothed["label"] != "idle":
+            if tick % 10 == 0:
                 wall = (time.perf_counter() - t0) * 1000
                 stable_tag = "STABLE" if smoothed["stable"] else "      "
                 log.info(
