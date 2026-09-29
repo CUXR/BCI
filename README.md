@@ -64,7 +64,8 @@ uv run python -m pipeline realtime \
   --model ml_pipeline/models/realtime_models.pkl \
   --skip-personalize \
   --serial 15C3 \
-  --mi-threshold 0.70
+  --mi-threshold 0.70 \
+  --blink-threshold 0.85
 ```
 
 `--serial` accepts either `15C3` or `Muse-15C3`. An explicit `--model` needs no
@@ -76,6 +77,8 @@ testing its movement mappings.
 `--mi-threshold 0.70` requires at least 70% model confidence before recognizing
 a motor imagery direction. You can adjust it; the default is 0.55. It also
 applies to the included left/right model.
+`--blink-threshold 0.85` requires at least 85% blink probability before
+recognizing an intentional blink; the default is 0.60.
 
 ## System Architecture
 

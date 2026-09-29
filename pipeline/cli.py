@@ -94,6 +94,8 @@ def _do_realtime(rest_argv: list[str]) -> int:
         parser.error("--re-personalize requires --participant")
     if args.mi_threshold is not None and not 0.0 <= args.mi_threshold <= 1.0:
         parser.error("--mi-threshold must be between 0 and 1")
+    if args.blink_threshold is not None and not 0.0 <= args.blink_threshold <= 1.0:
+        parser.error("--blink-threshold must be between 0 and 1")
     _configure_logging(args.verbose)
 
     bundle_path: Path
@@ -167,6 +169,8 @@ def _realtime_argparser() -> argparse.ArgumentParser:
                    help="Muse BLE device name or short ID (e.g. Muse-15C3 or 15C3)")
     p.add_argument("--mi-threshold", type=float, default=None,
                    help="Minimum confidence for motor imagery intent (default: 0.55)")
+    p.add_argument("--blink-threshold", type=float, default=None,
+                   help="Minimum confidence for intentional blink (default: 0.60)")
     p.add_argument("--no-ws", action="store_true",
                    help="Disable the prediction WebSocket server")
     p.add_argument("--ws-host", type=str, default=None,
@@ -199,7 +203,7 @@ def _launch_eeg_to_meta(args: argparse.Namespace, bundle_path: Path) -> int:
         ws_host=args.ws_host if args.ws_host is not None else eeg_config.WS_HOST,
         ws_port=args.ws_port if args.ws_port is not None else eeg_config.WS_PORT,
         mi_threshold=args.mi_threshold,
-        blink_threshold=None,
+        blink_threshold=args.blink_threshold,
         participant=args.participant,
     )
 
