@@ -144,6 +144,7 @@ async def run_pipeline(args):
 
     # ── 4. Inference loop ──────────────────────────────────────────
     tick = 0
+    last_recognized_intent = None
     try:
         while True:
             t0 = time.perf_counter()
@@ -157,6 +158,17 @@ async def run_pipeline(args):
 
             raw_pred = engine.classify(mi_win, blink_win)
             smoothed = smoother.update(raw_pred)
+
+            recognized_intent = (
+                smoothed["label"]
+                if smoothed["stable"] and smoothed["label"] in
+                ("left_motor_imagery", "right_motor_imagery")
+                else None
+            )
+            if recognized_intent != last_recognized_intent and recognized_intent:
+                direction = "left" if recognized_intent == "left_motor_imagery" else "right"
+                log.info("Recognized %s intent (confidence=%.2f)", direction, smoothed["confidence"])
+            last_recognized_intent = recognized_intent
 
             # broadcast to Unity clients
             if ws_server:
