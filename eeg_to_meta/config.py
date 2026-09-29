@@ -78,7 +78,6 @@ CLASS_THRESHOLDS: dict[str, float] = {
 # ── Smoothing / debounce ───────────────────────────────────────────
 SMOOTHING_WINDOW = 5           # majority-vote over last N predictions
 BLINK_COOLDOWN_S = 1.0         # suppress repeat blink triggers
-MI_COOLDOWN_S = 0.3            # suppress rapid MI toggles
 STABILITY_MIN_AGREE = 3        # out of SMOOTHING_WINDOW to be "stable"
 
 # ── WebSocket ──────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ from config import (
     FRONTAL_INDICES, TEMPORAL_INDICES,
     BLINK_TOTAL_FEATURES,
     BLINK_CONFIDENCE_THRESHOLD, MI_CONFIDENCE_THRESHOLD, CLASS_THRESHOLDS,
-    BLINK_COOLDOWN_S, MI_COOLDOWN_S,
+    BLINK_COOLDOWN_S,
     CLASS_NAMES,
 )
 from preprocess import preprocess_mi, preprocess_blink
@@ -186,7 +186,6 @@ class InferenceEngine:
         self.model = model
         self.ch_indices = list(range(N_CHANNELS))   # [0, 1, 2, 3]
         self._last_blink_time = 0.0
-        self._last_mi_time = 0.0
 
     def classify(self, mi_window: np.ndarray | None, blink_window: np.ndarray | None):
         """Run full inference on the latest windows.
@@ -243,7 +242,7 @@ class InferenceEngine:
                     log.debug("Blink prediction failed: %s", exc)
 
         # ── motor imagery ──────────────────────────────────────────
-        if mi_window is not None and (now - self._last_mi_time) >= MI_COOLDOWN_S:
+        if mi_window is not None:
             mi_clean = preprocess_mi(mi_window, SFREQ)
             mi_feat = _extract_mi_spectral_features(mi_clean, SFREQ, self.ch_indices)
             mi_feat = np.nan_to_num(mi_feat, nan=0.0, posinf=0.0, neginf=0.0)
@@ -275,7 +274,6 @@ class InferenceEngine:
                     threshold = float(CLASS_THRESHOLDS.get(pred_label, MI_CONFIDENCE_THRESHOLD))
 
                     if confidence >= threshold:
-                        self._last_mi_time = now
                         result["label"] = pred_label
                         result["internal_label"] = pred_label
                     result["confidence"] = confidence
