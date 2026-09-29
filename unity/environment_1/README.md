@@ -4,8 +4,9 @@ Open this project with Unity 2022.3.0f1. `Assets/Scenes/FreeNavScene.unity` is
 the indoor supermarket with BCI navigation on its XR Origin. The original
 `SampleScene.unity` remains the data-collection scene.
 
-The Quest app receives prediction frames at `ws://127.0.0.1:8765`. Forward and
-backward predictions move in the headset's horizontal facing direction;
+The Quest app receives prediction frames at `ws://<host>:8765`. The checked-in
+scene uses `127.0.0.1`, which requires `adb reverse` for a standalone Quest.
+Forward and backward predictions move in the headset's horizontal facing direction;
 left and right predictions rotate the XR Origin. Legacy left/right model
 labels also rotate. Blink is not mapped to movement. An unstable, low-confidence,
 disconnected, or stale prediction does not move the rig. Prediction frames must
@@ -34,6 +35,36 @@ until another accepted command arrives. Blink predictions are not rate-limited.
    Enter one direction at a time; each command sends five frames over half a
    second. The server reports when the Quest connects. Stop it with `q` before
    starting the real inference server, since both use port 8765.
+
+## Connect over Wi-Fi without a USB tether
+
+1. Put the Mac and Quest on a network where the Quest can reach the Mac. Find
+   the Mac's Wi-Fi IP with `ipconfig getifaddr en0` (check the active network
+   interface if this returns nothing).
+2. In Unity, open `Assets/Scenes/FreeNavScene.unity`. Select the XR Origin's
+   `PredictionWebSocketClient` component and set **Host** to that IP, leaving
+   **Port** at `8765`. Build and install the updated APK. The IP is stored in
+   the build, so update it and rebuild if the Mac's IP changes.
+3. On the Mac, start the live prediction server from the repository root:
+
+   ```sh
+   uv run python -m pipeline realtime --model ml_pipeline/models/realtime_models.pkl \
+     --skip-personalize --serial 15C3 --ws-host 0.0.0.0
+   ```
+
+   `0.0.0.0` is the server's bind address; enter the Mac's actual IP in Unity.
+   The prediction WebSocket has no authentication or encryption, so use a
+   trusted Wi-Fi network. Allow inbound Python connections through the Mac
+   firewall if prompted. No `adb reverse` is needed during use.
+4. To test the wireless link and movement without Muse EEG, stop the live
+   server and run:
+
+   ```sh
+   uv run python unity/environment_1/tools/smoke_predictions.py --host 0.0.0.0
+   ```
+
+   Launch the app and wait for `Quest connected` before entering a direction.
+   Only one server can use port `8765` at a time.
 
 The current checkout has a legacy two-class model but no four-class or
 participant bundle under `ml_pipeline/models/`. The legacy model can drive

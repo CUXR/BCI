@@ -1,6 +1,7 @@
 """Send one short prediction at a time to the indoor Quest scene."""
 
 import asyncio
+import argparse
 import json
 import time
 
@@ -31,9 +32,9 @@ async def handle_client(socket):
         print("Quest disconnected", flush=True)
 
 
-async def main():
-    async with websockets.serve(handle_client, "127.0.0.1", 8765):
-        print("Listening on ws://127.0.0.1:8765")
+async def main(host):
+    async with websockets.serve(handle_client, host, 8765):
+        print(f"Listening on ws://{host}:8765")
         while True:
             command = (await asyncio.to_thread(input, "Direction (forward/backward/left/right/legacy-left/legacy-right/low/unstable/q): ")).strip().lower()
             if command == "q":
@@ -56,4 +57,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="Bind address (use 0.0.0.0 for a Quest on the LAN)")
+    asyncio.run(main(parser.parse_args().host))
