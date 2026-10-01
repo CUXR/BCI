@@ -6,13 +6,13 @@ EEG-based control system for VR navigation using the Muse 2 headband. Decodes le
 
 **Real-time brainwave decoding** — EEG, band powers, and model feedback.
 
-[![Real-time Muse EEG and model feedback](docs/media/model-feedback.gif)](https://www.youtube.com/watch?v=xWrw_kHVDX8)
+[<img src="docs/media/model-feedback.gif" alt="Real-time Muse EEG and model feedback" width="100%">](https://www.youtube.com/watch?v=xWrw_kHVDX8)
 
 [Watch on YouTube](https://www.youtube.com/watch?v=xWrw_kHVDX8)
 
 **VR navigation** — Quest indoor navigation and prediction output.
 
-[![Quest VR navigation and prediction output](docs/media/vr-navigation.gif)](https://www.youtube.com/watch?v=tk2hOVV74W4)
+[<img src="docs/media/vr-navigation.gif" alt="Quest VR navigation and prediction output" width="100%">](https://www.youtube.com/watch?v=tk2hOVV74W4)
 
 [Watch on YouTube](https://www.youtube.com/watch?v=tk2hOVV74W4)
 
@@ -46,6 +46,8 @@ unzip ~/Downloads/Muse_Data-*.zip -d data/
 # 3. (Optional) Collect new data — requires a Muse headband
 #    --serial: Muse Bluetooth name (Muse-15C3 or Muse-12A6)
 #    Omit --serial to get an in-app device selection screen
+#    without hardware： add --simulate
+
 uv run python src/pilot_data_collection/psychopy_recording/muse_psychopy_recording_structured.py --name test --number 9 --serial Muse-15C3
 
 # 4. Train classifiers

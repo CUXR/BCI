@@ -178,7 +178,7 @@ class MusePsychopyRecorder:
     """Records MUSE EEG data with markers and trial log in Psychopy experiment."""
     
     def __init__(self, output_dir=None, participant_id=None, subject_name=None,
-                 subject_number=None, blink_window_ms=500, serial_number=None):
+                 subject_number=None, blink_window_ms=500, serial_number=None, simulate=False):
         """Initialize the recorder.
 
         Args:
@@ -187,11 +187,12 @@ class MusePsychopyRecorder:
             subject_name: Participant name (for metadata.yaml)
             subject_number: Subject number, e.g. 6 -> data/sub06/
             blink_window_ms: Window size in ms for blink extraction (±window_ms around event)
+            simulate: Use synthetic EEG without a headband; save under simulated_data/.
             serial_number: Muse serial number to connect to a specific device
         """
         if output_dir is None:
             sub_label = f"sub{subject_number:02d}" if subject_number is not None else "sub00"
-            output_dir = os.path.join("data", sub_label)
+            output_dir = os.path.join("simulated_data" if simulate else "data", sub_label)
         os.makedirs(output_dir, exist_ok=True)
 
         # Write metadata.yaml
@@ -199,6 +200,8 @@ class MusePsychopyRecorder:
         with open(metadata_path, "w") as f:
             f.write(f"date: {datetime.now().strftime('%Y-%m-%d')}\n")
             f.write(f"participant: {subject_name or participant_id or 'unknown'}\n")
+            if simulate:
+                f.write("simulated: true\n")
         print(f"Metadata saved to {metadata_path}")
         
         # Create output filenames with timestamp
@@ -227,8 +230,9 @@ class MusePsychopyRecorder:
         self.session_start_time = None
         
         # Board info (will be set after connection)
-        self.board_id = BoardIds.MUSE_2_BOARD.value
-        self.serial_number = serial_number
+        self.simulate = simulate
+        self.board_id = BoardIds.SYNTHETIC_BOARD.value if simulate else BoardIds.MUSE_2_BOARD.value
+        self.serial_number = None if simulate else serial_number
         self.sampling_rate = None
         self.eeg_channels = None
         self.marker_channel = None
@@ -256,7 +260,9 @@ class MusePsychopyRecorder:
             print("Already connected.")
             return True
 
-        device_label = f"Muse2 (serial={self.serial_number})" if self.serial_number else "Muse2"
+        device_label = "Synthetic EEG" if self.simulate else (
+            f"Muse2 (serial={self.serial_number})" if self.serial_number else "Muse2"
+        )
         BoardShim.enable_board_logger()
 
         for attempt in range(1, max_retries + 1):
@@ -272,6 +278,8 @@ class MusePsychopyRecorder:
                 self.board = board
                 self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
                 self.eeg_channels = BoardShim.get_eeg_channels(self.board_id)
+                if self.simulate:
+                    self.eeg_channels = self.eeg_channels[:4]
                 self.marker_channel = BoardShim.get_marker_channel(self.board_id)
                 self.timestamp_channel = BoardShim.get_timestamp_channel(self.board_id)
 
@@ -754,6 +762,8 @@ def run_experiment():
     parser.add_argument("--number", type=int, required=True, help="Subject number (e.g. 6)")
     parser.add_argument("--serial", type=str, default=None,
                         help="Muse serial number (skip device selection screen)")
+    parser.add_argument("--simulate", action="store_true",
+                        help="Try the experiment with synthetic EEG; save to simulated_data/")
     args = parser.parse_args()
 
     selected_serial = args.serial  # May be None; will prompt in-app if so
@@ -946,7 +956,7 @@ def run_experiment():
         '2': ("Muse-12A6",  "Muse #2 (12A6)"),
     }
 
-    if selected_serial is None:
+    if selected_serial is None and not args.simulate:
         device_lines = "\n".join(
             f"Press {key} — {label}" for key, (_, label) in MUSE_DEVICES.items()
         )
@@ -986,11 +996,15 @@ def run_experiment():
         participant_id=args.name,
         blink_window_ms=500,
         serial_number=selected_serial,
+        simulate=args.simulate,
     )
 
     # ========== PHASE 1: Connection ==========
     device_label = f" ({selected_serial})" if selected_serial else ""
-    instruction_text.text = f"Press SPACE to connect to Muse headband{device_label}"
+    instruction_text.text = (
+        "Simulation mode (synthetic EEG)\nPress SPACE to start the synthetic stream"
+        if args.simulate else f"Press SPACE to connect to Muse headband{device_label}"
+    )
     instruction_text.color = text_color
     update_display()
     instruction_text.draw()
@@ -1012,7 +1026,7 @@ def run_experiment():
             if recorder.connect():
                 connected = True
                 if recorder.start_streaming():
-                    status_text.text = "● Connected • Streaming"
+                    status_text.text = "● Simulation • Streaming" if args.simulate else "● Connected • Streaming"
                     status_text.color = success_color
                 else:
                     status_text.text = "● Connection failed"
