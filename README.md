@@ -267,6 +267,62 @@ The real-time GUI (`all_ml_models/realtime_feedback/realtime_feedback.py`) provi
 
 Adjustable confidence thresholds via the GUI. Blink detection has priority over motor imagery each update cycle (5 Hz).
 
+## WebSocket System
+
+The WebSocket connection carries model predictions from Python to Unity so
+EEG processing runs on the computer while navigation runs on the Quest.
+Raw EEG stays in the Python pipeline; the prediction socket sends class labels,
+confidence scores, and pipeline state events.
+
+| Socket | Direction | Purpose |
+|---|---|---|
+| `8765` — predictions | Python → Unity | Navigation predictions and lifecycle events |
+| `8766` — markers | Unity → Python | Trial markers and run/session boundaries during data collection |
+
+[`JsonWSServer`](eeg_to_meta/websocket_server.py) broadcasts one UTF-8 JSON
+message per WebSocket frame to connected clients. Unity's
+[`PredictionWebSocketClient`](unity/environment_1/Assets/Scripts/PredictionWebSocketClient.cs)
+connects to `ws://<host>:8765` and passes predictions to `FreeNavController`.
+With automatic connection enabled, it retries disconnected connections every
+2 seconds. See [Run the Unity Navigation System](#run-the-unity-navigation-system)
+above for USB and Wi-Fi setup.
+
+### Prediction Messages
+
+Example left-turn prediction:
+
+```json
+{
+  "type": "prediction",
+  "timestamp": 1711234567.89,
+  "predicted_class": "left_motor_imagery",
+  "confidence": 0.93,
+  "raw_probs": {"left": 0.93, "right": 0.07},
+  "stable": true,
+  "key_hint": "LeftArrow"
+}
+```
+
+- **Class and confidence** — `predicted_class` identifies the action; `confidence` is a score from 0 to 1. Legacy left/right labels rotate the player; compatible four-class models add `mi_forward`, `mi_backward`, `mi_rotate_left`, and `mi_rotate_right`.
+- **Stability and timing** — navigation predictions must be stable and meet the confidence threshold. The server sends at most one navigation command every 3 seconds and omits `idle` frames. Unity rejects stale timestamps and stops movement when an accepted command expires.
+- **Diagnostics** — `raw_probs` contains per-class probabilities. `key_hint` is advisory; navigation uses the class label directly, without injecting keyboard input.
+- **Pipeline state** — messages with `type: "state"` report lifecycle transitions such as `personalizing_start`, `personalizing_end`, and `realtime_ready` separately from predictions.
+
+### Test Without Muse EEG
+
+After configuring the Quest connection, run the synthetic prediction server
+from the repository root:
+
+```bash
+uv run python unity/environment_1/tools/smoke_predictions.py
+# For Wi-Fi, add: --host 0.0.0.0
+```
+
+Wait for `Quest connected`, then enter `forward`, `backward`, `left`, or `right`.
+Use `low` and `unstable` to check that rejected predictions do not move the
+player. This checks transport and Unity movement independently of EEG decoding.
+Enter `q` before starting live inference; both servers use port `8765`.
+
 ### Keyboard Shortcuts
 
 | Key | Action |
