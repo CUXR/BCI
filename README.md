@@ -1,14 +1,28 @@
 # BCI-VR Navigation Control
 
-EEG-based control system for VR navigation using the Muse 2 headband. Decodes left/right motor imagery and intentional blinks from 4-channel forehead EEG to enable hands-free VR navigation in Unity — no physical controllers required.
+EEG-based control system for VR navigation using the Muse 2 headband. Decodes left/right motor imagery and intentional blinks from 4-channel EEG to enable hands-free VR navigation in Unity — no physical controllers required.
+
+## Demos
+
+**Real-time brainwave decoding** — EEG, band powers, and model feedback.
+
+[![Real-time Muse EEG and model feedback](docs/media/model-feedback.gif)](https://www.youtube.com/watch?v=xWrw_kHVDX8)
+
+[Watch on YouTube](https://www.youtube.com/watch?v=xWrw_kHVDX8)
+
+**VR navigation** — Quest indoor navigation and prediction output.
+
+[![Quest VR navigation and prediction output](docs/media/vr-navigation.gif)](https://www.youtube.com/watch?v=tk2hOVV74W4)
+
+[Watch on YouTube](https://www.youtube.com/watch?v=tk2hOVV74W4)
 
 ## Control Scheme
 
-| Brain Signal | Action | Accuracy |
+| Brain Signal | Action in `FreeNavScene` | Historical offline accuracy |
 |---|---|---|
-| Left motor imagery | Navigate left | ~61% |
-| Right motor imagery | Navigate right | ~61% |
-| Intentional blink | Confirm / select | **88.7%** |
+| Left motor imagery | Rotate left | ~61% |
+| Right motor imagery | Rotate right | ~61% |
+| Intentional blink | Detected; interaction not yet mapped | **88.7%** |
 | Idle / baseline | No action | — |
 
 ## Hardware
@@ -102,7 +116,13 @@ applies to the included left/right model.
 `--blink-threshold 0.85` requires at least 85% blink probability before
 recognizing an intentional blink; the default is 0.60.
 
+The Python server sends at most one valid navigation command every 3 seconds.
+The scene moves for up to 0.5 seconds after an accepted frame; unstable,
+low-confidence, stale, or disconnected input does not sustain movement.
+
 ## System Architecture
+
+Desktop feedback workflow (accuracy figures refer to the historical offline evaluation below). The Quest workflow streams predictions from `eeg_to_meta` over WebSocket port `8765` to Unity's `PredictionWebSocketClient` and `FreeNavController`.
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -138,6 +158,11 @@ recognizing an intentional blink; the default is 0.60.
 ## Project Structure
 
 ```
+pipeline/                              # Collection, training, personalization, realtime CLI
+ml_pipeline/                           # Models and feature pipeline used by Quest inference
+eeg_to_meta/                           # Muse acquisition and prediction WebSocket server
+unity/environment_1/                   # Indoor Quest navigation and collection scenes
+
 all_ml_models/
   training/                             # Offline ML training pipelines
     bandpower/
@@ -188,7 +213,7 @@ data_analysis/                         # See data_analysis/README.md
 
 ## Data Collection
 
-Each session records two CSVs:
+The PsychoPy workflow records two CSVs per session:
 
 **EEG data** — continuous 4-channel EEG with timestamps aligned to BrainFlow's session clock:
 ```
@@ -206,7 +231,7 @@ Motor imagery epochs are interval-based (cue onset to spacebar press, 2–5s). B
 
 ## Classification Results
 
-4 subjects (sub02–sub05), 77 MI epochs, 190 blink epochs. Full breakdown in [`data_analysis/ml/results.md`](data_analysis/ml/results.md).
+Historical evaluation: 4 subjects (sub02–sub05), 77 MI epochs, 190 blink epochs. Full breakdown in [`data_analysis/ml/results.md`](data_analysis/ml/results.md).
 
 ### Blink Detection
 
@@ -227,7 +252,9 @@ Three feature pipelines were compared:
 - **v2** — v1 + sliding-window time-frequency (ERD/ERS dynamics)
 - **v3** — v2 + EEGNet-inspired fixed spatial/temporal features
 
-Key findings: Blink detection is deployment-ready. Motor imagery is near chance with 4 subjects — needs more data or paradigm refinement. Random Forest generalizes best across subjects.
+Key findings: Blink detection outperformed motor imagery in this offline evaluation. Motor imagery is near chance with 4 subjects — needs more data or paradigm refinement. These scores do not establish live Quest performance.
+
+The newer saved [pipeline evaluation](ml_pipeline/results/training_results.json) includes 11 subject IDs, 54 MI epochs, and 565 blink epochs. Random Forest MI scores are 52.39% within-subject and 45.66% LOSO; LDA blink scores are 89.41% and 82.07%, respectively. These are binary MI/blink offline results, not four-class navigation results.
 
 ## Real-Time Feedback System
 
@@ -249,13 +276,15 @@ Adjustable confidence thresholds via the GUI. Blink detection has priority over 
 
 ## Preprocessing Pipeline
 
-Applied per-channel, matching both offline training and real-time inference:
+Desktop MI preprocessing is applied per-channel:
 
 1. NaN/Inf sanitization
 2. Moving artifact removal (rolling z-score, 3-sigma threshold, 0.5s window)
 3. Linear detrend
 4. Notch filter (60 Hz powerline removal)
 5. Bandpass filter (1–40 Hz, 4th-order Butterworth)
+
+The Quest runtime uses separate MI (1–40 Hz) and blink (0.5–10 Hz) bandpasses, with 2-second MI and 0.5-second blink windows; see [`eeg_to_meta/config.py`](eeg_to_meta/config.py).
 
 ## Dependencies
 
